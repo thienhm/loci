@@ -199,10 +199,10 @@ function TicketHeader({
   const [editingAssignee, setEditingAssignee] = useState(false)
   const [assigneeDraft, setAssigneeDraft] = useState(ticket.assignee ?? '')
   // escapingAssignee prevents onBlur from firing a PATCH after Escape
-  const escapingAssignee = { current: false }
+  const escapingAssignee = useRef(false)
   const [editingLabels, setEditingLabels] = useState(false)
   const [labelsDraft, setLabelsDraft] = useState(ticket.labels.join(', '))
-  const escapingLabels = { current: false }
+  const escapingLabels = useRef(false)
   // Controlled progress state so slider position updates on refetch
   const [progressDraft, setProgressDraft] = useState(ticket.progress)
 
