@@ -6,3 +6,4 @@ dist/
 .agent/
 design-system/
 .worktrees/
+packages/server/public/
