@@ -222,7 +222,7 @@ loci/
 
 - [x] `/` → Dashboard
 - [x] `/project/:id` → Project board
-- [ ] `/project/:id/:ticketId` → Ticket detail (Phase 5)
+- [x] `/project/:id/:ticketId` → Ticket detail (Phase 5)
 
 ### 4.3 Dashboard page
 
@@ -268,30 +268,30 @@ loci/
 
 ---
 
-## Phase 5 — Ticket Detail
+## Phase 5 — Ticket Detail ✅
 
 > Goal: Full ticket view with editable markdown docs and attachments
 
 ### 5.1 Ticket header
 
-- [ ] Display: ID, title, status dropdown, priority dropdown, labels, assignee, progress bar
-- [ ] Inline edits save via `PATCH /api/tickets/:id`
+- [x] Display: ID, title, status dropdown, priority dropdown, labels, assignee, progress bar
+- [x] Inline edits save via `PATCH /api/tickets/:id`
 
 ### 5.2 Document tabs
 
-- [ ] Fetch doc list from `GET /api/tickets/:id`
-- [ ] Auto-render a tab for each `.md` file found
-- [ ] Fixed tab order: Description → Design → Plan → Summary → [others] → Attachments
-- [ ] Install `react-markdown` + `remark-gfm` for rendering
-- [ ] Toggle: View mode (rendered markdown) ↔ Edit mode (textarea)
-- [ ] Save via `PUT /api/tickets/:id/docs/:filename`
+- [x] Fetch doc list from `GET /api/tickets/:id`
+- [x] Auto-render a tab for each `.md` file found
+- [x] Fixed tab order: Description → Design → Plan → Summary → [others] → Attachments
+- [x] Install `react-markdown` + `remark-gfm` for rendering
+- [x] Toggle: View mode (rendered markdown) ↔ Edit mode (textarea)
+- [x] Save via `PUT /api/tickets/:id/docs/:filename`
 
 ### 5.3 Attachments tab
 
-- [ ] Display list of linked file paths
-- [ ] Add attachment: input a workspace-relative path
-- [ ] Remove attachment
-- [ ] Save via `PUT /api/tickets/:id/attachments`
+- [x] Display list of linked file paths
+- [x] Add attachment: input a workspace-relative path
+- [x] Remove attachment
+- [x] Save via `PUT /api/tickets/:id/attachments`
 
 ---
 
