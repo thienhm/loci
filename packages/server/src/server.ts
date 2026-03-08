@@ -1,6 +1,8 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { registerRoutes } from './routes'
+import { createMcpServer } from './mcp'
 
 export async function createServer(port: number): Promise<void> {
   const app = Fastify({ logger: false })
@@ -17,6 +19,19 @@ export async function createServer(port: number): Promise<void> {
   // Register all API routes
   await registerRoutes(app)
 
+  // MCP endpoint — stateless, one transport per request
+  app.post('/mcp', async (req, reply) => {
+    const mcpServer = createMcpServer()
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
+    await mcpServer.connect(transport)
+    await transport.handleRequest(req.raw, reply.raw, req.body)
+    reply.hijack()
+  })
+
+  app.get('/mcp', async (req, reply) => {
+    reply.status(405).send({ error: 'MCP requires POST requests' })
+  })
+
   // Root — placeholder until Phase 4 web UI exists
   app.get('/', async (_req, reply) => {
     return reply
@@ -32,4 +47,5 @@ export async function createServer(port: number): Promise<void> {
   await app.listen({ port, host: '127.0.0.1' })
   console.log(`✓ Loci server running at http://localhost:${port}`)
   console.log(`  API: http://localhost:${port}/api/projects`)
+  console.log(`  MCP: http://localhost:${port}/mcp`)
 }

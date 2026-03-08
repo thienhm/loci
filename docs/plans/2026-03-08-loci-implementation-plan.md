@@ -166,22 +166,22 @@ loci/
 > Goal: Claude Code can connect and perform all ticket operations
 
 ### 3.1 MCP integration
-- [ ] Install `@modelcontextprotocol/sdk`
-- [ ] Mount MCP handler at `/mcp` in Fastify
-- [ ] Expose `loci://instructions` resource (contents of `LOCI.md`)
+- [x] Install `@modelcontextprotocol/sdk`
+- [x] Mount MCP handler at `/mcp` in Fastify
+- [x] Expose `loci://instructions` resource (contents of `LOCI.md`)
 
 ### 3.2 MCP tools
-- [ ] `list_projects()`
-- [ ] `list_tickets(project_id?, status?, assignee?)`
-- [ ] `get_ticket(id)` — returns ticket + all doc contents
-- [ ] `create_ticket(title, priority?, labels?, assignee?)`
-- [ ] `update_ticket(id, fields)`
-- [ ] `read_ticket_doc(id, filename)`
-- [ ] `write_ticket_doc(id, filename, content)`
+- [x] `list_projects()`
+- [x] `list_tickets(project_id?, status?, assignee?)`
+- [x] `get_ticket(id)` — returns ticket + all doc contents
+- [x] `create_ticket(title, priority?, labels?, assignee?)`
+- [x] `update_ticket(id, fields)`
+- [x] `read_ticket_doc(id, filename)`
+- [x] `write_ticket_doc(id, filename, content)`
 
 ### 3.3 Verification
-- [ ] Add Loci to local Claude Code MCP config
-- [ ] Test: Claude can list tickets, create a ticket, write `implementation_plan.md`
+- [x] Add Loci to local Claude Code MCP config
+- [x] Test: Claude can list tickets, create a ticket, write `implementation_plan.md`
 
 ---
 
