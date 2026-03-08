@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
@@ -83,6 +83,22 @@ export function TicketDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['ticket', projectId, ticketId] }),
   })
 
+  // ── WAI-ARIA keyboard navigation ──────────────────────────────────────────
+  const allTabs = [...docFilenames, 'attachments']
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  function handleTabKeyDown(e: React.KeyboardEvent, index: number) {
+    let next = index
+    if (e.key === 'ArrowRight') next = (index + 1) % allTabs.length
+    else if (e.key === 'ArrowLeft') next = (index - 1 + allTabs.length) % allTabs.length
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = allTabs.length - 1
+    else return
+    e.preventDefault()
+    setActiveTab(allTabs[next])
+    tabRefs.current[next]?.focus()
+  }
+
   if (isLoading) {
     return (
       <div style={styles.center}>
@@ -113,13 +129,18 @@ export function TicketDetailPage() {
       {/* Ticket header */}
       <TicketHeader ticket={ticket} onPatch={(fields: TicketUpdateInput) => patchMutation.mutate(fields)} />
 
-      {/* Tabs */}
-      <div style={styles.tabBar}>
-        {docFilenames.map((filename) => (
+      {/* Tabs — WAI-ARIA tablist pattern */}
+      <div role="tablist" aria-label="Ticket sections" style={styles.tabBar}>
+        {docFilenames.map((filename, i) => (
           <button
             key={filename}
             id={`tab-${filename}`}
+            role="tab"
+            aria-selected={activeTab === filename}
+            tabIndex={activeTab === filename ? 0 : -1}
+            ref={(el) => { tabRefs.current[i] = el }}
             onClick={() => setActiveTab(filename)}
+            onKeyDown={(e) => handleTabKeyDown(e, i)}
             style={{
               ...styles.tab,
               ...(activeTab === filename ? styles.tabActive : {}),
@@ -130,7 +151,12 @@ export function TicketDetailPage() {
         ))}
         <button
           id="tab-attachments"
+          role="tab"
+          aria-selected={activeTab === 'attachments'}
+          tabIndex={activeTab === 'attachments' ? 0 : -1}
+          ref={(el) => { tabRefs.current[docFilenames.length] = el }}
           onClick={() => setActiveTab('attachments')}
+          onKeyDown={(e) => handleTabKeyDown(e, docFilenames.length)}
           style={{
             ...styles.tab,
             ...(activeTab === 'attachments' ? styles.tabActive : {}),
