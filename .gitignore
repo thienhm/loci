@@ -5,3 +5,4 @@ dist/
 .env
 .agent/
 design-system/
+.worktrees/
