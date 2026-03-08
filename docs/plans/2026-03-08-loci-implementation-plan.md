@@ -244,6 +244,30 @@ loci/
 
 ---
 
+## Phase 4.6 — Single-Command Serve ✅
+
+> Goal: `loci serve` starts everything; one terminal for dev, one command for prod
+
+### 4.6.1 Production — server serves built web assets
+
+- [x] Add `build` script to `packages/web` that outputs to `packages/server/public/`
+- [x] Register `@fastify/static` in `packages/server` pointing at `public/` — serves `index.html` at `/`
+- [x] Add catch-all `GET /*` route in server to return `index.html` (enables client-side routing)
+- [x] Remove the old placeholder `GET /` handler
+
+### 4.6.2 Dev — single root command for both servers
+
+- [x] Add `concurrently` to root devDependencies
+- [x] Add root `dev` script: `concurrently "bun run --cwd packages/server dev" "bun run --cwd packages/web dev"`
+- [x] Verify: `bun run dev` at repo root starts both, Vite proxy forwards `/api` to `:3333`
+
+### 4.6.3 Verification
+
+- [x] `bun run dev` → open `http://localhost:5173` → dashboard loads
+- [x] `bun run --cwd packages/web build && loci serve` → open `http://localhost:3333` → dashboard loads (no Vite)
+
+---
+
 ## Phase 5 — Ticket Detail
 
 > Goal: Full ticket view with editable markdown docs and attachments
