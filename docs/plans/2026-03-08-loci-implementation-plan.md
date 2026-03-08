@@ -15,6 +15,22 @@
 
 ---
 
+### Test-Driven Development (TDD)
+
+**All phases from Phase 3 onward must follow TDD:**
+1. Write failing tests first
+2. Implement until tests pass
+3. Run the full suite before marking a phase done: `bun test` (from root or per-package)
+
+**Test locations:**
+- `packages/cli/src/__tests__/` — CLI unit tests (`bun test --cwd packages/cli`)
+- `packages/server/src/__tests__/` — server data + route integration tests (`bun test --cwd packages/server`)
+- Future packages follow the same pattern: `src/__tests__/` inside the package
+
+**Testing tools:** Bun's built-in test runner (`bun:test`). For server routes, use Fastify's `inject()` — no real HTTP server needed. Isolate filesystem tests with temp dirs and `process.env.HOME` overrides.
+
+---
+
 ### UI Design Work
 If any UI design decisions are needed during implementation (new components, layout choices, color/spacing decisions not covered by existing docs), the implementing agent **MUST** use the `ui-ux-pro-max` skill before writing any UI code.
 
@@ -116,26 +132,33 @@ loci/
 
 ---
 
-## Phase 2 — Server
+## Phase 2 — Server ✅
 > Goal: Fastify running with REST API, all data readable/writable via HTTP
 
 ### 2.1 Server scaffold (`packages/server`)
-- [ ] Install Fastify + plugins (`@fastify/cors`, `@fastify/static`)
-- [ ] Entry point: `loci serve` starts server on port 3333
-- [ ] Load `~/.loci/registry.json` on startup
-- [ ] Serve frontend static files from `packages/web/dist`
+- [x] Install Fastify + plugins (`@fastify/cors`, `@fastify/static`)
+- [x] Entry point: `loci serve` starts server on port 3333
+- [x] Load `~/.loci/registry.json` on startup (read lazily per-request)
+- [x] Serve placeholder page at `GET /` — web UI coming in Phase 4
 
 ### 2.2 REST API routes
-- [ ] `GET  /api/projects` — all projects from registry
-- [ ] `GET  /api/projects/:id` — single project metadata
-- [ ] `GET  /api/projects/:id/tickets` — all tickets (with optional `?status=`, `?assignee=`)
-- [ ] `GET  /api/tickets/:id` — single ticket + doc list
-- [ ] `POST /api/projects/:id/tickets` — create ticket
-- [ ] `PATCH /api/tickets/:id` — update ticket fields
-- [ ] `GET  /api/tickets/:id/docs/:filename` — read a markdown doc
-- [ ] `PUT  /api/tickets/:id/docs/:filename` — write a markdown doc
-- [ ] `GET  /api/tickets/:id/attachments` — list attachments
-- [ ] `PUT  /api/tickets/:id/attachments` — update attachments list
+> Note: all ticket routes are nested under `/api/projects/:projectId/` — `:projectId` is a UUID.
+
+- [x] `GET  /api/projects` — all projects from registry
+- [x] `GET  /api/projects/:projectId` — single project metadata
+- [x] `GET  /api/projects/:projectId/tickets` — all tickets (with optional `?status=`, `?assignee=`)
+- [x] `GET  /api/projects/:projectId/tickets/:ticketId` — single ticket + doc list
+- [x] `POST /api/projects/:projectId/tickets` — create ticket
+- [x] `PATCH /api/projects/:projectId/tickets/:ticketId` — update ticket fields
+- [x] `GET  /api/projects/:projectId/tickets/:ticketId/docs/:filename` — read a markdown doc
+- [x] `PUT  /api/projects/:projectId/tickets/:ticketId/docs/:filename` — write a markdown doc (`.md` only)
+- [x] `GET  /api/projects/:projectId/tickets/:ticketId/attachments` — list attachments
+- [x] `PUT  /api/projects/:projectId/tickets/:ticketId/attachments` — update attachments list
+
+### 2.3 Tests (TDD baseline)
+- [x] `packages/server/src/__tests__/data.test.ts` — 14 unit tests for data layer
+- [x] `packages/server/src/__tests__/routes.test.ts` — 24 route integration tests via Fastify `inject`
+- [x] `packages/cli/src/__tests__/project.test.ts` — 9 unit tests for CLI project helpers
 
 ---
 

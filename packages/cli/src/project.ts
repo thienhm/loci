@@ -2,7 +2,9 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import type { Project, Registry, RegistryEntry } from '@loci/shared'
 
-const REGISTRY_PATH = join(process.env.HOME!, '.loci', 'registry.json')
+function registryPath(): string {
+  return join(process.env.HOME!, '.loci', 'registry.json')
+}
 const LOCI_DIR = '.loci'
 
 /**
@@ -36,14 +38,16 @@ export function writeProject(workspaceRoot: string, project: Project): void {
 }
 
 export function readRegistry(): Registry {
-  if (!existsSync(REGISTRY_PATH)) return { projects: [] }
-  return JSON.parse(readFileSync(REGISTRY_PATH, 'utf8'))
+  const path = registryPath()
+  if (!existsSync(path)) return { projects: [] }
+  return JSON.parse(readFileSync(path, 'utf8'))
 }
 
 export function writeRegistry(registry: Registry): void {
-  const dir = dirname(REGISTRY_PATH)
+  const path = registryPath()
+  const dir = dirname(path)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-  writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 2))
+  writeFileSync(path, JSON.stringify(registry, null, 2))
 }
 
 export function getTicketsDir(workspaceRoot: string): string {
