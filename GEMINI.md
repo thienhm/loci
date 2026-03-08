@@ -51,6 +51,28 @@
 5. **Document Results**: Add review section to `tasks/todo.md`
 6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
 
+## Skills Framework
+
+Skills live in `.agent/skills/<skill-name>/SKILL.md`. Use `view_file` to read them.
+
+**The Rule:** If there is even a 1% chance a skill applies, read it with `view_file` BEFORE responding or taking any action. This is non-negotiable.
+
+| Trigger                             | Skill to Read                                           |
+| ----------------------------------- | ------------------------------------------------------- |
+| Starting any session                | `.agent/skills/using-superpowers/SKILL.md`              |
+| Building any feature/component      | `.agent/skills/brainstorming/SKILL.md`                  |
+| Writing multi-step plan             | `.agent/skills/writing-plans/SKILL.md`                  |
+| Executing a plan (same session)     | `.agent/skills/subagent-driven-development/SKILL.md`    |
+| Executing a plan (new session)      | `.agent/skills/executing-plans/SKILL.md`                |
+| Writing any implementation code     | `.agent/skills/test-driven-development/SKILL.md`        |
+| Any bug / unexpected behavior       | `.agent/skills/systematic-debugging/SKILL.md`           |
+| Claiming work done / fixed          | `.agent/skills/verification-before-completion/SKILL.md` |
+| Completing a feature / before merge | `.agent/skills/requesting-code-review/SKILL.md`         |
+| Receiving code review feedback      | `.agent/skills/receiving-code-review/SKILL.md`          |
+| 2+ independent tasks in parallel    | `.agent/skills/dispatching-parallel-agents/SKILL.md`    |
+| Starting isolated feature work      | `.agent/skills/using-git-worktrees/SKILL.md`            |
+| Merging / finishing branch          | `.agent/skills/finishing-a-development-branch/SKILL.md` |
+
 ## Core Principles
 
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
