@@ -146,14 +146,7 @@ export function createMcpServer(): McpServer {
       const ticket = readTicketWithDocs(entry.path, id)
       if (!ticket) return errorResult(`Ticket ${id} not found`)
 
-      // Read all doc contents
-      const docs: Record<string, string> = {}
-      for (const filename of ticket.docs) {
-        const content = readTicketDoc(entry.path, id, filename)
-        if (content !== null) docs[filename] = content
-      }
-
-      return jsonResult({ ...ticket, docs })
+      return jsonResult(ticket)
     }
   )
 

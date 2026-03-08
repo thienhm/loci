@@ -159,15 +159,15 @@ describe('writeTicket / readTicketWithDocs', () => {
     expect(readTicketWithDocs(tmpWorkspace, 'TST-999')).toBeNull()
   })
 
-  it('readTicketWithDocs includes list of .md docs', () => {
+  it('readTicketWithDocs includes docs as filename → content map', () => {
     seedWorkspace(tmpWorkspace)
     createTicket(tmpWorkspace, makeTicket())
     writeTicketDoc(tmpWorkspace, 'TST-001', 'implementation_plan.md', '# Plan\n')
 
     const result = readTicketWithDocs(tmpWorkspace, 'TST-001')
-    expect(result?.docs).toContain('description.md')
-    expect(result?.docs).toContain('implementation_plan.md')
-    expect(result?.docs).not.toContain('attachments.json') // not a .md file
+    expect(result?.docs['description.md']).toBeDefined()
+    expect(result?.docs['implementation_plan.md']).toBe('# Plan\n')
+    expect('attachments.json' in (result?.docs ?? {})).toBe(false) // not a .md file
   })
 })
 

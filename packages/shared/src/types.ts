@@ -39,7 +39,7 @@ export interface Ticket {
 // Ticket as stored on disk — same as Ticket
 export type TicketFile = Ticket
 
-// Ticket with its list of available doc filenames
+// Ticket with its docs as a filename → content map
 export interface TicketWithDocs extends Ticket {
-  docs: string[]        // e.g. ["description.md", "implementation_plan.md"]
+  docs: Record<string, string> // e.g. { "description.md": "# Hello\n..." }
 }

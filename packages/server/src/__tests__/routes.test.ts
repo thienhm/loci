@@ -205,13 +205,14 @@ describe('POST /api/projects/:projectId/tickets', () => {
 // ---------------------------------------------------------------------------
 
 describe('GET /api/projects/:projectId/tickets/:ticketId', () => {
-  it('returns ticket with docs list', async () => {
+  it('returns ticket with docs map', async () => {
     seedTicket('TST-001')
     const res = await app.inject({ method: 'GET', url: `/api/projects/${PROJECT_ID}/tickets/TST-001` })
     expect(res.statusCode).toBe(200)
     const body = res.json<any>()
     expect(body.id).toBe('TST-001')
-    expect(body.docs).toContain('description.md')
+    expect(body.docs['description.md']).toBeDefined()
+    expect(body.docs['description.md']).toContain('Test ticket')
   })
 
   it('returns 404 for unknown ticket', async () => {

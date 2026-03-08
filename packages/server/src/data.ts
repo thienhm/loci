@@ -70,10 +70,11 @@ export function readTicketWithDocs(workspaceRoot: string, ticketId: string): Tic
 
   const ticket: Ticket = JSON.parse(readFileSync(ticketJsonPath, 'utf8'))
 
-  // Collect all .md files in the ticket folder
-  const docs = readdirSync(ticketDir)
-    .filter((f) => f.endsWith('.md'))
-    .sort()
+  // Collect all .md files and read their contents into a map
+  const docs: Record<string, string> = {}
+  for (const f of readdirSync(ticketDir).filter((f) => f.endsWith('.md')).sort()) {
+    docs[f] = readFileSync(join(ticketDir, f), 'utf8')
+  }
 
   return { ...ticket, docs }
 }
