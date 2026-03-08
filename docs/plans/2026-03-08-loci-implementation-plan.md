@@ -59,60 +59,60 @@ loci/
 > Goal: `loci init` and `loci add` working end-to-end with real files on disk
 
 ### 1.1 Monorepo setup
-- [ ] Init root `package.json` with Bun workspaces
-- [ ] Create `packages/shared`, `packages/cli`, `packages/server`, `packages/web`
-- [ ] Configure root `tsconfig.json` with path aliases
-- [ ] Add `.gitignore`
+- [x] Init root `package.json` with Bun workspaces
+- [x] Create `packages/shared`, `packages/cli`, `packages/server`, `packages/web`
+- [x] Configure root `tsconfig.json` with path aliases
+- [x] Add `.gitignore`
 
 ### 1.2 Shared types (`packages/shared`)
-- [ ] `Project` type — id, name, prefix, nextId, createdAt
-- [ ] `Ticket` type — id, title, status, priority, labels, assignee, progress, createdAt, updatedAt
-- [ ] `Registry` type — list of `{ id, name, prefix, path }`
-- [ ] Status enum: `todo | in_progress | done`
-- [ ] Priority enum: `low | medium | high`
-- [ ] Assignee format: `"human"` (project owner, no username needed) or `"agent:<name>"` (e.g. `"agent:claude"`); `null` when unassigned
-- [ ] ID generation utility: `formatId(prefix, nextId)` → `"APP-001"`
+- [x] `Project` type — id, name, prefix, nextId, createdAt
+- [x] `Ticket` type — id, title, status, priority, labels, assignee, progress, createdAt, updatedAt
+- [x] `Registry` type — list of `{ id, name, prefix, path }`
+- [x] Status enum: `todo | in_progress | done`
+- [x] Priority enum: `low | medium | high`
+- [x] Assignee format: `"human"` (project owner, no username needed) or `"agent:<name>"` (e.g. `"agent:claude"`); `null` when unassigned
+- [x] ID generation utility: `formatId(prefix, nextId)` → `"APP-001"`
   - Implementation: `prefix + "-" + String(nextId).padStart(3, "0")`
   - No upper cap — naturally grows beyond 3 digits: APP-999 → APP-1000
-- [ ] Progress field: integer 0–100, manual only, defaults to 0, never auto-calculated
+- [x] Progress field: integer 0–100, manual only, defaults to 0, never auto-calculated
 
 ### 1.3 CLI scaffold (`packages/cli`)
-- [ ] Install Commander.js
-- [ ] Wire up `loci` binary entry point via `package.json#bin`
-- [ ] Register subcommands: `init`, `add`, `list`, `status`, `serve`
+- [x] Install Commander.js
+- [x] Wire up `loci` binary entry point via `package.json#bin`
+- [x] Register subcommands: `init`, `add`, `list`, `status`, `serve`
 
 ### 1.4 `loci init`
-- [ ] Prompt for project name and prefix (validate: uppercase, 2–5 chars)
-- [ ] Create `.loci/project.json` in current directory
-- [ ] Create/update `~/.loci/registry.json` — append new project entry
-- [ ] Generate `LOCI.md` in workspace root
-- [ ] Detect and append pointer to `CLAUDE.md`, `GEMINI.md`, `.cursorrules`, `AGENTS.md` if they exist
-- [ ] Print success message with next steps
+- [x] Prompt for project name and prefix (validate: uppercase, 2–5 chars)
+- [x] Create `.loci/project.json` in current directory
+- [x] Create/update `~/.loci/registry.json` — append new project entry
+- [x] Generate `LOCI.md` in workspace root
+- [x] Detect and append pointer to `CLAUDE.md`, `GEMINI.md`, `.cursorrules`, `AGENTS.md` if they exist
+- [x] Print success message with next steps
 
 ### 1.5 `loci add`
-- [ ] Walk up directory tree to find `.loci/` (or error if not found)
-- [ ] Atomically increment `nextId` in `project.json`
-- [ ] Create `.loci/tickets/<ID>/` folder
-- [ ] Write `ticket.json` with defaults: `{ status: "todo", priority: "medium", assignee: null, labels: [], progress: 0 }`
-- [ ] Write `description.md` with empty content (always created — this is the required default doc)
-- [ ] Write `attachments.json` with empty array `[]`
-- [ ] Print created ticket ID
+- [x] Walk up directory tree to find `.loci/` (or error if not found)
+- [x] Atomically increment `nextId` in `project.json`
+- [x] Create `.loci/tickets/<ID>/` folder
+- [x] Write `ticket.json` with defaults: `{ status: "todo", priority: "medium", assignee: null, labels: [], progress: 0 }`
+- [x] Write `description.md` with empty content (always created — this is the required default doc)
+- [x] Write `attachments.json` with empty array `[]`
+- [x] Print created ticket ID
 
 > Note: `description.md` and `attachments.json` are created here (Phase 1), not in Phase 5. Phase 5 only adds the UI to view/edit them.
 
 ### 1.6 `loci list`
-- [ ] Read all `ticket.json` files in `.loci/tickets/`
-- [ ] Print table: ID | Title | Status | Priority | Assignee
+- [x] Read all `ticket.json` files in `.loci/tickets/`
+- [x] Print table: ID | Title | Status | Priority | Assignee
 
 ### 1.7 `loci status <id> <status>`
-- [ ] Find ticket by ID, validate status value
-- [ ] Update `ticket.json` with new status + `updatedAt`
-- [ ] Print confirmation
+- [x] Find ticket by ID, validate status value
+- [x] Update `ticket.json` with new status + `updatedAt`
+- [x] Print confirmation
 
 ### 1.8 Bootstrap Loci on itself
-- [ ] Run `loci init` in this repo (project name: "Loci", prefix: `LCI`)
-- [ ] Create tickets for Phase 2, 3, 4, 5, 6 in Loci
-- [ ] From this point, track all remaining progress in Loci itself
+- [x] Run `loci init` in this repo (project name: "Loci", prefix: `LCI`)
+- [x] Create tickets for Phase 2, 3, 4, 5, 6 in Loci
+- [x] From this point, track all remaining progress in Loci itself
 
 ---
 
