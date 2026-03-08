@@ -48,3 +48,8 @@ export interface TicketCounts {
   in_progress: number
   done: number
 }
+
+// Ticket with docs map — returned by GET /api/projects/:id/tickets/:ticketId
+export interface TicketWithDocs extends Ticket {
+  docs: Record<string, string> // filename → content
+}

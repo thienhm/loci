@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   DndContext,
@@ -219,6 +219,7 @@ export function ProjectBoardPage() {
                   key={col.id}
                   column={col}
                   tickets={colTickets}
+                  projectId={projectId!}
                 />
               )
             })}
@@ -226,13 +227,14 @@ export function ProjectBoardPage() {
 
           <DragOverlay>
             {activeTicket && (
-              <TicketCard ticket={activeTicket} isDragging />
+              <TicketCard ticket={activeTicket} isDragging projectId={projectId!} />
             )}
           </DragOverlay>
         </DndContext>
       ) : (
         <TicketTable
           tickets={tickets}
+          projectId={projectId!}
           sortField={sortField}
           sortDir={sortDir}
           onSort={(field) => {
@@ -252,9 +254,11 @@ export function ProjectBoardPage() {
 function KanbanColumn({
   column,
   tickets,
+  projectId,
 }: {
   column: { id: TicketStatus; label: string }
   tickets: Ticket[]
+  projectId: string
 }) {
   const { setNodeRef, isOver } = useSortable({ id: column.id })
 
@@ -282,7 +286,7 @@ function KanbanColumn({
       <SortableContext items={tickets.map(t => t.id)} strategy={verticalListSortingStrategy}>
         <div style={styles.columnBody}>
           {tickets.map((ticket) => (
-            <SortableTicketCard key={ticket.id} ticket={ticket} />
+            <SortableTicketCard key={ticket.id} ticket={ticket} projectId={projectId} />
           ))}
 
           {tickets.length === 0 && (
@@ -300,7 +304,7 @@ function KanbanColumn({
 // Sortable ticket card wrapper
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SortableTicketCard({ ticket }: { ticket: Ticket }) {
+function SortableTicketCard({ ticket, projectId }: { ticket: Ticket; projectId: string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
   })
@@ -313,7 +317,7 @@ function SortableTicketCard({ ticket }: { ticket: Ticket }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      <TicketCard ticket={ticket} dragHandleProps={listeners} />
+      <TicketCard ticket={ticket} projectId={projectId} dragHandleProps={listeners} />
     </div>
   )
 }
@@ -324,10 +328,12 @@ function SortableTicketCard({ ticket }: { ticket: Ticket }) {
 
 function TicketCard({
   ticket,
+  projectId,
   isDragging,
   dragHandleProps,
 }: {
   ticket: Ticket
+  projectId: string
   isDragging?: boolean
   dragHandleProps?: Record<string, unknown>
 }) {
@@ -351,7 +357,13 @@ function TicketCard({
         >
           <GripVertical size={12} color="var(--color-text-muted)" />
         </div>
-        <span style={styles.ticketId}>{ticket.id}</span>
+        <Link
+          to={`/project/${projectId}/${ticket.id}`}
+          style={{ ...styles.ticketId, textDecoration: 'none' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {ticket.id}
+        </Link>
       </div>
 
       {/* Title */}
@@ -372,11 +384,13 @@ function TicketCard({
 
 function TicketTable({
   tickets,
+  projectId,
   sortField,
   sortDir,
   onSort,
 }: {
   tickets: Ticket[]
+  projectId: string
   sortField: SortField
   sortDir: SortDir
   onSort: (field: SortField) => void
@@ -427,7 +441,12 @@ function TicketTable({
               onMouseLeave={(e) => (e.currentTarget.style.background = '')}
             >
               <td style={styles.td}>
-                <span style={styles.ticketId}>{ticket.id}</span>
+                <Link
+                  to={`/project/${projectId}/${ticket.id}`}
+                  style={{ ...styles.ticketId, textDecoration: 'none' }}
+                >
+                  {ticket.id}
+                </Link>
               </td>
               <td style={{ ...styles.td, maxWidth: '300px' }}>
                 <span style={{ fontSize: '13px', color: 'var(--color-text)', fontWeight: '500' }}>

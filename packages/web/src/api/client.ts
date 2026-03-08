@@ -1,4 +1,4 @@
-import type { Project, Ticket, TicketCreateInput, TicketUpdateInput } from '../types'
+import type { Project, Ticket, TicketWithDocs, TicketCreateInput, TicketUpdateInput } from '../types'
 
 const BASE = '/api'
 
@@ -62,4 +62,61 @@ export async function updateTicket(
   input: TicketUpdateInput
 ): Promise<Ticket> {
   return patch<Ticket>(`/projects/${projectId}/tickets/${ticketId}`, input)
+}
+
+// Single ticket with docs map
+export async function fetchTicket(
+  projectId: string,
+  ticketId: string
+): Promise<TicketWithDocs> {
+  return get<TicketWithDocs>(`/projects/${projectId}/tickets/${ticketId}`)
+}
+
+// Read a markdown doc's raw content
+export async function fetchDoc(
+  projectId: string,
+  ticketId: string,
+  filename: string
+): Promise<string> {
+  const res = await fetch(`/api/projects/${projectId}/tickets/${ticketId}/docs/${filename}`)
+  if (!res.ok) throw new Error(`GET doc ${filename} failed: ${res.status}`)
+  return res.text()
+}
+
+// Write a markdown doc
+export async function writeDoc(
+  projectId: string,
+  ticketId: string,
+  filename: string,
+  content: string
+): Promise<void> {
+  const res = await fetch(`/api/projects/${projectId}/tickets/${ticketId}/docs/${filename}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'text/plain' },
+    body: content,
+  })
+  if (!res.ok) throw new Error(`PUT doc ${filename} failed: ${res.status}`)
+}
+
+// Fetch attachments list
+export async function fetchAttachments(
+  projectId: string,
+  ticketId: string
+): Promise<string[]> {
+  return get<string[]>(`/projects/${projectId}/tickets/${ticketId}/attachments`)
+}
+
+// Write attachments list
+export async function writeAttachments(
+  projectId: string,
+  ticketId: string,
+  paths: string[]
+): Promise<string[]> {
+  const res = await fetch(`/api/projects/${projectId}/tickets/${ticketId}/attachments`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(paths),
+  })
+  if (!res.ok) throw new Error(`PUT attachments failed: ${res.status}`)
+  return res.json()
 }
