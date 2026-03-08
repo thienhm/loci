@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from '../App'
@@ -8,6 +8,15 @@ import App from '../App'
 vi.mock('../api/client', () => ({
   fetchProjects: vi.fn().mockResolvedValue([]),
   fetchTickets: vi.fn().mockResolvedValue([]),
+  fetchProject: vi.fn().mockResolvedValue({
+    id: 'test-id',
+    name: 'Test Project',
+    prefix: 'TST',
+    nextId: 1,
+    createdAt: new Date().toISOString(),
+  }),
+  createTicket: vi.fn(),
+  updateTicket: vi.fn(),
 }))
 
 function makeWrapper() {
@@ -24,7 +33,7 @@ function makeWrapper() {
 }
 
 describe('App smoke tests', () => {
-  it('renders without crashing', () => {
+  it('renders without crashing — sidebar is present', () => {
     const Wrapper = makeWrapper()
     render(
       <Wrapper>
@@ -33,12 +42,11 @@ describe('App smoke tests', () => {
         </MemoryRouter>
       </Wrapper>
     )
-    // App shell and main content should be present
     expect(document.getElementById('loci-sidebar')).toBeInTheDocument()
     expect(document.getElementById('loci-main')).toBeInTheDocument()
   })
 
-  it('dashboard route mounts at /', () => {
+  it('dashboard route mounts at / — shows heading after data loads', async () => {
     const Wrapper = makeWrapper()
     render(
       <Wrapper>
@@ -47,24 +55,28 @@ describe('App smoke tests', () => {
         </MemoryRouter>
       </Wrapper>
     )
-    // Dashboard page renders the "All Projects" heading
-    expect(screen.getByRole('heading', { name: /all projects/i })).toBeInTheDocument()
+    // Wait for the async query to resolve and heading to appear
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /all projects/i })).toBeInTheDocument()
+    })
   })
 
-  it('project board route mounts at /project/:id', () => {
+  it('project board route mounts at /project/:id', async () => {
     const Wrapper = makeWrapper()
     render(
       <Wrapper>
-        <MemoryRouter initialEntries={['/project/test-project-id']}>
+        <MemoryRouter initialEntries={['/project/test-id']}>
           <App />
         </MemoryRouter>
       </Wrapper>
     )
-    // ProjectBoardPage renders
-    expect(screen.getByRole('heading', { name: /project board/i })).toBeInTheDocument()
+    // Wait for project board heading
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /test project/i })).toBeInTheDocument()
+    })
   })
 
-  it('unknown routes redirect to dashboard', () => {
+  it('unknown routes redirect to dashboard', async () => {
     const Wrapper = makeWrapper()
     render(
       <Wrapper>
@@ -73,7 +85,8 @@ describe('App smoke tests', () => {
         </MemoryRouter>
       </Wrapper>
     )
-    // Should redirect to dashboard
-    expect(screen.getByRole('heading', { name: /all projects/i })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /all projects/i })).toBeInTheDocument()
+    })
   })
 })
