@@ -404,7 +404,7 @@ Loci also exposes a `loci://instructions` MCP resource that agents can read at s
 
 ### Port Configuration
 - Default port: `3333`
-- If port is already in use: exit immediately with a clear error message
+- If port is already in use: detect the conflicting PID via `lsof`, print it, and guide the user with the exact `kill <pid>` command to run; then exit with a non-zero code
 - Override: `loci serve --port <n>` (implemented in Phase 6)
 - `LOCI.md` hardcodes `localhost:3333`; if a custom port is used, regenerate with `loci init --port <n>`
 

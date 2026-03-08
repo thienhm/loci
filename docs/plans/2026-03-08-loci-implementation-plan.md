@@ -302,7 +302,8 @@ loci/
 - [ ] File-watch on `.loci/` — emit SSE events when tickets change
 - [ ] Frontend subscribes to SSE → auto-refresh board without polling
 - [ ] `loci open` command — opens `localhost:3333/project/<current-project-id>` in browser
-- [ ] Port conflict handling in `loci serve` (configurable via `--port`)
+- [x] Port conflict handling in `loci serve` — detects PID via `lsof`, prints `kill <pid>` guidance, exits cleanly
+- [ ] Port override via `loci serve --port <n>`
 - [ ] Error states in UI (project not found, server offline)
 - [ ] Basic keyboard shortcuts: `N` = new ticket, `K/L` = toggle view
 

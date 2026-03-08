@@ -4,6 +4,7 @@ import staticPlugin from '@fastify/static'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execSync } from 'node:child_process'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { registerRoutes } from './routes'
 import { createMcpServer } from './mcp'
@@ -61,7 +62,25 @@ export async function createServer(port: number): Promise<void> {
     reply.status(404).send({ error: 'Not found' })
   })
 
-  await app.listen({ port, host: '127.0.0.1' })
+  try {
+    await app.listen({ port, host: '127.0.0.1' })
+  } catch (err: unknown) {
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'EADDRINUSE') {
+      console.error(`✗ Port ${port} is already in use.`)
+      try {
+        const pid = execSync(`lsof -ti tcp:${port}`).toString().trim()
+        if (pid) {
+          console.error(`  Process using it: PID ${pid}`)
+          console.error(`  To free the port, run:\n\n    kill ${pid}\n`)
+        }
+      } catch {
+        console.error(`  Could not detect the process. Try:\n\n    lsof -i :${port}\n`)
+      }
+      process.exit(1)
+    }
+    throw err
+  }
+
   console.log(`✓ Loci server running at http://localhost:${port}`)
   console.log(`  API: http://localhost:${port}/api/projects`)
   console.log(`  MCP: http://localhost:${port}/mcp`)
