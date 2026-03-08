@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { registerRoutes } from './routes'
+import { registerSseRoutes } from './sse'
 import { createMcpServer } from './mcp'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
@@ -34,6 +35,7 @@ export async function createServer(port: number): Promise<void> {
 
   // Register all API routes
   await registerRoutes(app)
+  await registerSseRoutes(app)
 
   // MCP endpoint — stateless, one transport per request
   app.post('/mcp', async (req, reply) => {
