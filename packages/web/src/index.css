@@ -1,0 +1,74 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  /* Loci design tokens */
+  --color-primary: #0d9488;
+  --color-primary-hover: #0f766e;
+  --color-secondary: #14b8a6;
+  --color-accent: #f97316;
+  --color-accent-hover: #ea6c08;
+  --color-background: #f0fdfa;
+  --color-surface: #ffffff;
+  --color-text: #134e4a;
+  --color-text-muted: #5eaba1;
+  --color-border: #e2e8f0;
+
+  /* Status colors */
+  --color-status-todo: #94a3b8;
+  --color-status-in-progress: #3b82f6;
+  --color-status-done: #22c55e;
+
+  /* Priority colors */
+  --color-priority-high: #ef4444;
+  --color-priority-medium: #f59e0b;
+  --color-priority-low: #94a3b8;
+
+  /* Typography */
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
