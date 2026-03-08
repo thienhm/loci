@@ -38,6 +38,7 @@ type SortDir = 'asc' | 'desc'
 const COLUMNS: { id: TicketStatus; label: string }[] = [
   { id: 'todo', label: 'Todo' },
   { id: 'in_progress', label: 'In Progress' },
+  { id: 'in_review', label: 'In Review' },
   { id: 'done', label: 'Done' },
 ]
 
@@ -522,11 +523,13 @@ function TicketTable({
 const statusColors: Record<TicketStatus, string> = {
   todo: '#94A3B8',
   in_progress: '#3B82F6',
+  in_review: '#F59E0B',
   done: '#22C55E',
 }
 const statusLabels: Record<TicketStatus, string> = {
   todo: 'Todo',
   in_progress: 'In Progress',
+  in_review: 'In Review',
   done: 'Done',
 }
 

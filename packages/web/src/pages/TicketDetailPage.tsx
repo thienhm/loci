@@ -285,6 +285,7 @@ function TicketHeader({
           >
             <option value="todo">Todo</option>
             <option value="in_progress">In Progress</option>
+            <option value="in_review">In Review</option>
             <option value="done">Done</option>
           </select>
         </div>

@@ -109,7 +109,7 @@ export function createMcpServer(): McpServer {
       description: 'List tickets, optionally filtered by project, status, or assignee',
       inputSchema: z.object({
         project_id: z.string().optional().describe('Project UUID (omit for all projects)'),
-        status: z.enum(['todo', 'in_progress', 'done']).optional(),
+        status: z.enum(['todo', 'in_progress', 'in_review', 'done']).optional(),
         assignee: z.string().optional(),
       }),
     },
@@ -213,7 +213,7 @@ export function createMcpServer(): McpServer {
         id: z.string().describe('Ticket ID, e.g. LCI-001'),
         fields: z.object({
           title: z.string().optional(),
-          status: z.enum(['todo', 'in_progress', 'done']).optional(),
+          status: z.enum(['todo', 'in_progress', 'in_review', 'done']).optional(),
           priority: z.enum(['low', 'medium', 'high']).optional(),
           labels: z.array(z.string()).optional(),
           assignee: z.string().nullable().optional(),

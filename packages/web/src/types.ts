@@ -2,7 +2,7 @@
 // These mirror the types in @loci/shared but are kept local to avoid
 // cross-package import complexity in the Vite build
 
-export type TicketStatus = 'todo' | 'in_progress' | 'done'
+export type TicketStatus = 'todo' | 'in_progress' | 'in_review' | 'done'
 export type TicketPriority = 'low' | 'medium' | 'high'
 
 export interface Project {
@@ -46,6 +46,7 @@ export interface TicketUpdateInput {
 export interface TicketCounts {
   todo: number
   in_progress: number
+  in_review: number
   done: number
 }
 

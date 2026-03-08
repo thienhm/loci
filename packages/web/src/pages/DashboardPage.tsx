@@ -78,10 +78,11 @@ function ProjectCard({ project, onOpen }: { project: Project; onOpen: () => void
     (acc, t) => {
       if (t.status === 'todo') acc.todo++
       else if (t.status === 'in_progress') acc.in_progress++
+      else if (t.status === 'in_review') acc.in_review++
       else if (t.status === 'done') acc.done++
       return acc
     },
-    { todo: 0, in_progress: 0, done: 0 }
+    { todo: 0, in_progress: 0, in_review: 0, done: 0 }
   )
 
   const total = tickets.length

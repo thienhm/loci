@@ -1,4 +1,4 @@
-export type TicketStatus = 'todo' | 'in_progress' | 'done'
+export type TicketStatus = 'todo' | 'in_progress' | 'in_review' | 'done'
 
 export type TicketPriority = 'low' | 'medium' | 'high'
 
