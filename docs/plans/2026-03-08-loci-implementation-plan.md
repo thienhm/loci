@@ -295,17 +295,17 @@ loci/
 
 ---
 
-## Phase 6 — Polish
+## Phase 6 — Polish ✅
 
 > Goal: Real-time feel, small UX improvements
 
-- [ ] File-watch on `.loci/` — emit SSE events when tickets change
-- [ ] Frontend subscribes to SSE → auto-refresh board without polling
-- [ ] `loci open` command — opens `localhost:3333/project/<current-project-id>` in browser
+- [x] File-watch on `.loci/` — emit SSE events when tickets change
+- [x] Frontend subscribes to SSE → auto-refresh board without polling
+- [x] `loci open` command — opens `localhost:3333/project/<current-project-id>` in browser
 - [x] Port conflict handling in `loci serve` — detects PID via `lsof`, prints `kill <pid>` guidance, exits cleanly
-- [ ] Port override via `loci serve --port <n>`
-- [ ] Error states in UI (project not found, server offline)
-- [ ] Basic keyboard shortcuts: `N` = new ticket, `K/L` = toggle view
+- [x] Port override via `loci serve --port <n>`
+- [x] Error states in UI (project not found, server offline)
+- [x] Basic keyboard shortcuts: `N` = new ticket, `K/L` = toggle view
 
 ---
 
