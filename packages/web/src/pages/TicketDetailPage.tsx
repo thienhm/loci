@@ -23,7 +23,7 @@ import {
   writeAttachments,
   updateTicket,
 } from '../api/client'
-import type { TicketStatus, TicketPriority, TicketWithDocs } from '../types'
+import type { TicketStatus, TicketPriority, TicketWithDocs, TicketUpdateInput } from '../types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab ordering
@@ -77,7 +77,7 @@ export function TicketDetailPage() {
   }, [ticket, activeTab])
 
   const patchMutation = useMutation({
-    mutationFn: (fields: Partial<TicketWithDocs>) =>
+    mutationFn: (fields: TicketUpdateInput) =>
       updateTicket(projectId!, ticketId!, fields),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['ticket', projectId, ticketId] }),
@@ -111,7 +111,7 @@ export function TicketDetailPage() {
       </Link>
 
       {/* Ticket header */}
-      <TicketHeader ticket={ticket} onPatch={(fields) => patchMutation.mutate(fields)} />
+      <TicketHeader ticket={ticket} onPatch={(fields: TicketUpdateInput) => patchMutation.mutate(fields)} />
 
       {/* Tabs */}
       <div style={styles.tabBar}>
@@ -166,14 +166,19 @@ function TicketHeader({
   onPatch,
 }: {
   ticket: TicketWithDocs
-  onPatch: (fields: Partial<TicketWithDocs>) => void
+  onPatch: (fields: TicketUpdateInput) => void
 }) {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(ticket.title)
   const [editingAssignee, setEditingAssignee] = useState(false)
   const [assigneeDraft, setAssigneeDraft] = useState(ticket.assignee ?? '')
+  // escapingAssignee prevents onBlur from firing a PATCH after Escape
+  const escapingAssignee = { current: false }
   const [editingLabels, setEditingLabels] = useState(false)
   const [labelsDraft, setLabelsDraft] = useState(ticket.labels.join(', '))
+  const escapingLabels = { current: false }
+  // Controlled progress state so slider position updates on refetch
+  const [progressDraft, setProgressDraft] = useState(ticket.progress)
 
   function saveTitle() {
     if (titleDraft.trim() && titleDraft.trim() !== ticket.title) {
@@ -183,6 +188,7 @@ function TicketHeader({
   }
 
   function saveAssignee() {
+    if (escapingAssignee.current) { escapingAssignee.current = false; return }
     const val = assigneeDraft.trim() || null
     if (val !== ticket.assignee) {
       onPatch({ assignee: val })
@@ -191,11 +197,16 @@ function TicketHeader({
   }
 
   function saveLabels() {
+    if (escapingLabels.current) { escapingLabels.current = false; return }
     const parsed = labelsDraft
       .split(',')
       .map((l) => l.trim())
       .filter(Boolean)
-    onPatch({ labels: parsed })
+    // Dirty check — only patch if labels actually changed
+    const changed =
+      parsed.length !== ticket.labels.length ||
+      parsed.some((l, i) => l !== ticket.labels[i])
+    if (changed) onPatch({ labels: parsed })
     setEditingLabels(false)
   }
 
@@ -280,7 +291,7 @@ function TicketHeader({
                 onChange={(e) => setAssigneeDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') saveAssignee()
-                  if (e.key === 'Escape') setEditingAssignee(false)
+                  if (e.key === 'Escape') { escapingAssignee.current = true; setEditingAssignee(false) }
                 }}
                 onBlur={saveAssignee}
                 style={{ ...styles.select, width: '160px' }}
@@ -299,13 +310,14 @@ function TicketHeader({
 
         {/* Progress */}
         <div style={styles.metaItem}>
-          <span style={styles.metaLabel}>Progress {ticket.progress}%</span>
+          <span style={styles.metaLabel}>Progress {progressDraft}%</span>
           <input
             id="ticket-progress-slider"
             type="range"
             min={0}
             max={100}
-            defaultValue={ticket.progress}
+            value={progressDraft}
+            onChange={(e) => setProgressDraft(Number(e.target.value))}
             onMouseUp={(e) => onPatch({ progress: Number((e.target as HTMLInputElement).value) })}
             onTouchEnd={(e) => onPatch({ progress: Number((e.target as HTMLInputElement).value) })}
             style={{ width: '120px', accentColor: 'var(--color-primary)' }}
@@ -326,7 +338,7 @@ function TicketHeader({
               onChange={(e) => setLabelsDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') saveLabels()
-                if (e.key === 'Escape') setEditingLabels(false)
+                if (e.key === 'Escape') { escapingLabels.current = true; setEditingLabels(false) }
               }}
               onBlur={saveLabels}
               style={{ ...styles.select, width: '260px' }}
