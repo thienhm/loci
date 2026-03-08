@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -27,6 +27,8 @@ import {
   GripVertical,
 } from 'lucide-react'
 import { fetchProject, fetchTickets, updateTicket, createTicket } from '../api/client'
+import { useSSE } from '../hooks/useSSE'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import type { Project, Ticket, TicketStatus, TicketPriority } from '../types'
 
 type ViewMode = 'kanban' | 'list'
@@ -48,6 +50,20 @@ export function ProjectBoardPage() {
   const [newTicketTitle, setNewTicketTitle] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  // Auto-refresh board when server emits SSE change events
+  useSSE(projectId)
+
+  // Keyboard shortcuts: N = new ticket, K = kanban view, L = list view
+  const shortcuts = useMemo(() => ({
+    'n': () => { setNewTicketTitle(''); setShowNewTicket(true) },
+    'N': () => { setNewTicketTitle(''); setShowNewTicket(true) },
+    'k': () => setViewMode('kanban'),
+    'K': () => setViewMode('kanban'),
+    'l': () => setViewMode('list'),
+    'L': () => setViewMode('list'),
+  }), [])
+  useKeyboardShortcuts(shortcuts)
 
   const { data: project, isLoading: projectLoading } = useQuery<Project>({
     queryKey: ['project', projectId],
@@ -116,12 +132,30 @@ export function ProjectBoardPage() {
   }
 
   if (error || !project) {
+    // Detect server offline vs. project not found
+    const isOffline = error instanceof TypeError && error.message.includes('fetch')
     return (
       <div style={styles.center}>
-        <AlertCircle size={22} style={{ color: 'var(--color-priority-high)' }} />
-        <span style={{ color: 'var(--color-priority-high)', marginTop: '8px' }}>
-          Project not found
-        </span>
+        <AlertCircle size={32} style={{ color: 'var(--color-priority-high)', marginBottom: '12px' }} />
+        <h2 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--color-text)', margin: '0 0 6px' }}>
+          {isOffline ? 'Cannot connect to Loci server' : 'Project not found'}
+        </h2>
+        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 16px', textAlign: 'center' }}>
+          {isOffline
+            ? 'Make sure the server is running: loci serve'
+            : `No project found with ID: ${projectId}`}
+        </p>
+        <Link
+          to="/"
+          style={{
+            fontSize: '13px',
+            color: 'var(--color-primary)',
+            textDecoration: 'none',
+            fontWeight: '600',
+          }}
+        >
+          ← Back to dashboard
+        </Link>
       </div>
     )
   }
