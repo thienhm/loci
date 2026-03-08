@@ -6,5 +6,9 @@ export const serveCommand = new Command('serve')
   .option('-p, --port <number>', 'Port to listen on', '3333')
   .action(async (options) => {
     const port = parseInt(options.port, 10)
+    if (isNaN(port) || port < 1 || port > 65535) {
+      console.error(`✗ Invalid port: "${options.port}". Must be a number between 1 and 65535.`)
+      process.exit(1)
+    }
     await createServer(port)
   })

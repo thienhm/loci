@@ -27,6 +27,7 @@ export function useSSE(projectId: string | undefined) {
           if (data.type === 'change') {
             queryClient.invalidateQueries({ queryKey: ['tickets', projectId] })
             queryClient.invalidateQueries({ queryKey: ['project', projectId] })
+            queryClient.invalidateQueries({ queryKey: ['projects'] })
           }
         } catch {
           // Ignore malformed events

@@ -66,7 +66,7 @@ describe('loci open command', () => {
     expect(errorMessage).toContain('No Loci project found')
   })
 
-  it('constructs correct URL from project.json', () => {
+  it('constructs correct URL from project.json and logs it', async () => {
     // Seed a project so findWorkspaceRoot works
     mkdirSync(join(tmpWorkspace, '.loci'), { recursive: true })
     writeFileSync(
@@ -80,33 +80,22 @@ describe('loci open command', () => {
       }, null, 2)
     )
 
-    // Capture what URL openUrl is called with by mocking spawn
-    const spawnCalls: string[] = []
     const originalCwd = process.cwd
     process.cwd = () => tmpWorkspace
 
-    // Monkey-patch the module-level spawn by importing and wrapping the command action
-    // We verify the console.log output instead (it logs the URL it will open)
     const logged: string[] = []
     const originalLog = console.log
     console.log = (...args: unknown[]) => { logged.push(args.join(' ')) }
 
-    let didExit = false
-    const originalExit = process.exit.bind(process)
-    process.exit = ((_code?: number) => { didExit = true }) as typeof process.exit
+    try {
+      // Actually invoke the command — spawn fires but is fire-and-forget (unref'd)
+      await openCommand.parseAsync(['node', 'loci', 'open'], { from: 'user' })
+    } finally {
+      process.cwd = originalCwd
+      console.log = originalLog
+    }
 
-    // We can't easily stub spawn without DI, so just verify the URL in the log
-    // by reimplementing one step: read project + build URL
-    const { findWorkspaceRoot, readProject } = require('../project')
-    process.cwd = () => tmpWorkspace
-    const root = findWorkspaceRoot(tmpWorkspace)
-    const project = readProject(root!)
-    const url = `http://localhost:3333/project/${project.id}`
-
-    console.log = originalLog
-    process.cwd = originalCwd
-    process.exit = originalExit
-
-    expect(url).toBe(`http://localhost:3333/project/${PROJECT_ID}`)
+    const expectedUrl = `http://localhost:3333/project/${PROJECT_ID}`
+    expect(logged.some((line) => line.includes(expectedUrl))).toBe(true)
   })
 })
