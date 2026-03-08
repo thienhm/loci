@@ -1,0 +1,31 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "loci",
+    },
+    "packages/cli": {
+      "name": "@loci/cli",
+      "version": "0.1.0",
+      "bin": {
+        "loci": "./src/index.ts",
+      },
+      "dependencies": {
+        "@loci/shared": "workspace:*",
+        "commander": "^12.1.0",
+      },
+    },
+    "packages/shared": {
+      "name": "@loci/shared",
+      "version": "0.1.0",
+    },
+  },
+  "packages": {
+    "@loci/cli": ["@loci/cli@workspace:packages/cli"],
+
+    "@loci/shared": ["@loci/shared@workspace:packages/shared"],
+
+    "commander": ["commander@12.1.0", "", {}, "sha512-Vw8qHK3bZM9y/P10u3Vib8o/DdkvA2OtPtZvD871QKjy74Wj1WSKFILMPRPSdUSx5RFK1arlJzEtA4PkFgnbuA=="],
+  }
+}

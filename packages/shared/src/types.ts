@@ -1,0 +1,45 @@
+export type TicketStatus = 'todo' | 'in_progress' | 'done'
+
+export type TicketPriority = 'low' | 'medium' | 'high'
+
+// "human" = project owner, "agent:<name>" = AI agent (e.g. "agent:claude"), null = unassigned
+export type Assignee = 'human' | `agent:${string}` | null
+
+export interface Project {
+  id: string
+  name: string
+  prefix: string        // e.g. "APP" — uppercase, 2–5 chars
+  nextId: number        // auto-incrementing counter for ticket IDs
+  createdAt: string     // ISO 8601
+}
+
+export interface RegistryEntry {
+  id: string
+  name: string
+  prefix: string
+  path: string          // absolute path to workspace root
+}
+
+export interface Registry {
+  projects: RegistryEntry[]
+}
+
+export interface Ticket {
+  id: string            // e.g. "APP-001"
+  title: string
+  status: TicketStatus
+  priority: TicketPriority
+  labels: string[]
+  assignee: Assignee
+  progress: number      // 0–100, manual only, never auto-calculated
+  createdAt: string     // ISO 8601
+  updatedAt: string     // ISO 8601
+}
+
+// Ticket as stored on disk — same as Ticket
+export type TicketFile = Ticket
+
+// Ticket with its list of available doc filenames
+export interface TicketWithDocs extends Ticket {
+  docs: string[]        // e.g. ["description.md", "implementation_plan.md"]
+}
