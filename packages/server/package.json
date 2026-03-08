@@ -7,7 +7,7 @@
     ".": "./src/server.ts"
   },
   "scripts": {
-    "dev": "bun run src/index.ts",
+    "dev": "bun --watch run src/index.ts",
     "test": "bun test"
   },
   "dependencies": {

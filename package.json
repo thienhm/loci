@@ -7,7 +7,10 @@
   ],
   "scripts": {
     "build": "bun run --filter '*' build",
-    "dev": "bun run --filter '*' dev",
+    "dev": "concurrently --names server,web --prefix-colors blue,green \"bun run --cwd packages/server dev\" \"bun run --cwd packages/web dev\"",
     "test": "bun test --cwd packages/cli && bun test --cwd packages/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

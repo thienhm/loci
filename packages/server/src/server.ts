@@ -1,8 +1,15 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import staticPlugin from '@fastify/static'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { registerRoutes } from './routes'
 import { createMcpServer } from './mcp'
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
+const publicDir = join(__dirname, '..', 'public')
 
 export async function createServer(port: number): Promise<void> {
   const app = Fastify({ logger: false })
@@ -15,6 +22,14 @@ export async function createServer(port: number): Promise<void> {
   app.addContentTypeParser('text/plain', { parseAs: 'string' }, (_req, body, done) => {
     done(null, body)
   })
+
+  // Serve built web assets from public/ (production mode)
+  if (existsSync(publicDir)) {
+    await app.register(staticPlugin, {
+      root: publicDir,
+      prefix: '/',
+    })
+  }
 
   // Register all API routes
   await registerRoutes(app)
@@ -32,15 +47,17 @@ export async function createServer(port: number): Promise<void> {
     reply.status(405).send({ error: 'MCP requires POST requests' })
   })
 
-  // Root — placeholder until Phase 4 web UI exists
-  app.get('/', async (_req, reply) => {
-    return reply
-      .type('text/html')
-      .send('<h1>Loci</h1><p>Web UI coming in Phase 4. API is live at <a href="/api/projects">/api/projects</a>.</p>')
-  })
+  // SPA catch-all — return index.html for any non-API, non-MCP route
+  // so React Router can handle client-side navigation
+  app.setNotFoundHandler((req, reply) => {
+    const isApi = req.url.startsWith('/api')
+    const isMcp = req.url.startsWith('/mcp')
+    const indexPath = join(publicDir, 'index.html')
 
-  // 404 catch-all
-  app.setNotFoundHandler((_req, reply) => {
+    if (!isApi && !isMcp && existsSync(indexPath)) {
+      return reply.type('text/html').send(readFileSync(indexPath, 'utf-8'))
+    }
+
     reply.status(404).send({ error: 'Not found' })
   })
 
@@ -48,4 +65,7 @@ export async function createServer(port: number): Promise<void> {
   console.log(`✓ Loci server running at http://localhost:${port}`)
   console.log(`  API: http://localhost:${port}/api/projects`)
   console.log(`  MCP: http://localhost:${port}/mcp`)
+  if (existsSync(publicDir)) {
+    console.log(`  Web: http://localhost:${port}`)
+  }
 }
