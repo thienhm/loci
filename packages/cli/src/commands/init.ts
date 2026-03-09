@@ -21,16 +21,29 @@ See LOCI.md for full instructions on working with this project's tickets.
 MCP server: http://localhost:${port}/mcp
 `
 
-function generateLociMd(project: Project, port = 3333): string {
+export function generateLociMd(project: Project, port = 3333): string {
   return `# Loci — Project Instructions
 Project: ${project.name} | Prefix: ${project.prefix} | Server: http://localhost:${port}
 
+## Project Guard
+- Only manage tickets for **this project** (prefix: \`${project.prefix}\`)
+- Never read or update tickets from other projects
+
 ## Ticket Workflow
-- Before starting: \`get_ticket(<id>)\`, read \`description.md\`
-- Create \`implementation_plan.md\` before coding
-- Set status to \`in_progress\` when starting work
-- Write \`summary.md\` when done, set status to \`done\`
-- Assign yourself: \`assignee: "agent:<your-name>"\`
+
+### Starting a Ticket
+1. Call \`get_ticket(<id>)\` and read \`description.md\`
+2. If the description is vague, ask the user to clarify → update \`description.md\` with the outcome
+3. Brainstorm the approach before touching any code
+4. Assign yourself: \`update_ticket(id, { assignee: "agent:<your-name>" })\`
+5. Ask the user: **"New git branch, git worktree, or work on the current branch?"**
+6. Set status to \`in_progress\`, create \`implementation_plan.md\`
+
+### Completing a Ticket
+1. Write \`summary.md\` describing what was done
+2. Set status to \`in_review\`
+3. Ask the user to verify the implementation
+4. **Only set status to \`done\` when the user explicitly confirms** — never auto-close
 
 ## Document Conventions
 - \`description.md\`         → what the ticket is, acceptance criteria (always created)
@@ -45,7 +58,12 @@ Project: ${project.name} | Prefix: ${project.prefix} | Server: http://localhost:
 - \`"agent:<name>"\`   → AI agent, e.g. \`"agent:claude"\`, \`"agent:gemini"\`
 
 ## Status Values
-- \`todo\` | \`in_progress\` | \`done\` — any status can transition to any other freely
+Flow: \`todo\` → \`in_progress\` → \`in_review\` → \`done\`
+
+- \`todo\`        — not started
+- \`in_progress\` — actively being worked on
+- \`in_review\`   — implementation complete, awaiting user verification
+- \`done\`        — verified and closed (only set on explicit user request)
 
 ## MCP Tools Available
 \`\`\`

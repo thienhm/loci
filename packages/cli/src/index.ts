@@ -6,6 +6,7 @@ import { listCommand } from './commands/list'
 import { statusCommand } from './commands/status'
 import { serveCommand } from './commands/serve'
 import { openCommand } from './commands/open'
+import { updateCommand } from './commands/update'
 
 const program = new Command()
 
@@ -20,5 +21,6 @@ program.addCommand(listCommand)
 program.addCommand(statusCommand)
 program.addCommand(serveCommand)
 program.addCommand(openCommand)
+program.addCommand(updateCommand)
 
 program.parse()
