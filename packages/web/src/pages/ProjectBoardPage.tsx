@@ -375,21 +375,19 @@ function TicketCard({
   return (
     <div
       id={`ticket-card-${ticket.id}`}
+      {...dragHandleProps}
       style={{
         ...styles.ticketCard,
         boxShadow: isDragging
           ? '0 8px 24px rgba(13,148,136,0.18)'
           : '0 1px 3px rgba(0,0,0,0.06)',
-        cursor: isDragging ? 'grabbing' : 'default',
+        cursor: isDragging ? 'grabbing' : 'grab',
         transform: isDragging ? 'rotate(2deg)' : 'none',
       }}
     >
-      {/* Drag handle + ID */}
+      {/* Drag handle icon + ID */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <div
-          {...dragHandleProps}
-          style={styles.dragHandle}
-        >
+        <div style={styles.dragHandle}>
           <GripVertical size={12} color="var(--color-text-muted)" />
         </div>
         <Link
