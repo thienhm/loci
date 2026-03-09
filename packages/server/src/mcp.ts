@@ -153,21 +153,28 @@ export function createMcpServer(): McpServer {
   server.registerTool(
     'create_ticket',
     {
-      description: 'Create a new ticket in the first registered project',
+      description: 'Create a new ticket in a project',
       inputSchema: z.object({
         title: z.string(),
+        project_id: z.string().optional().describe('Project UUID (omit to use first registered project)'),
         priority: z.enum(['low', 'medium', 'high']).optional(),
         labels: z.array(z.string()).optional(),
         assignee: z.string().nullable().optional(),
       }),
     },
-    async ({ title, priority, labels, assignee }) => {
+    async ({ title, project_id, priority, labels, assignee }) => {
       const registry = readRegistry()
       if (registry.projects.length === 0) {
         return errorResult('No projects registered. Run `loci init` first.')
       }
 
-      const entry = registry.projects[0]
+      const entry = project_id
+        ? registry.projects.find((p) => p.id === project_id) ?? null
+        : registry.projects[0]
+
+      if (!entry) {
+        return errorResult(`Project not found: ${project_id}`)
+      }
       const project = readProject(entry.path)
       const { formatId } = await import('@loci/shared')
       const id = formatId(project.prefix, project.nextId)

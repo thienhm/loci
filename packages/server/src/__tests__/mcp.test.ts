@@ -186,6 +186,49 @@ describe('create_ticket', () => {
     expect(result.labels).toEqual(['bug'])
     expect(result.assignee).toBe('human')
   })
+
+  it('creates ticket in the specified project when project_id is given', async () => {
+    const secondWorkspace = mkdtempSync(join(tmpdir(), 'loci-mcp-ws2-'))
+    const SECOND_ID = 'second-project-uuid'
+    const SECOND_PREFIX = 'SEC'
+
+    // Register both projects
+    writeFileSync(
+      join(tmpHome, '.loci', 'registry.json'),
+      JSON.stringify({
+        projects: [
+          { id: PROJECT_ID, name: 'McpTest', prefix: PROJECT_PREFIX, path: tmpWorkspace },
+          { id: SECOND_ID, name: 'SecondProject', prefix: SECOND_PREFIX, path: secondWorkspace },
+        ],
+      }, null, 2)
+    )
+    mkdirSync(join(secondWorkspace, '.loci', 'tickets'), { recursive: true })
+    writeFileSync(
+      join(secondWorkspace, '.loci', 'project.json'),
+      JSON.stringify({ id: SECOND_ID, name: 'SecondProject', prefix: SECOND_PREFIX, nextId: 1, createdAt: '2026-01-01T00:00:00.000Z' }, null, 2)
+    )
+
+    try {
+      const { client } = await buildClient()
+      const result = parseResult(await callTool(client, 'create_ticket', {
+        title: 'Ticket in second project',
+        project_id: SECOND_ID,
+      }))
+      expect(result.id).toBe('SEC-001')
+      expect(result.title).toBe('Ticket in second project')
+    } finally {
+      rmSync(secondWorkspace, { recursive: true, force: true })
+    }
+  })
+
+  it('returns error when project_id does not match any project', async () => {
+    const { client } = await buildClient()
+    const raw = await callTool(client, 'create_ticket', {
+      title: 'Bad project',
+      project_id: 'nonexistent-uuid',
+    })
+    expect(raw.isError).toBe(true)
+  })
 })
 
 // ---------------------------------------------------------------------------
