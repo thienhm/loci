@@ -385,28 +385,49 @@ function TicketCard({
         transform: isDragging ? 'rotate(2deg)' : 'none',
       }}
     >
-      {/* Drag handle icon + ID */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <div style={styles.dragHandle}>
-          <GripVertical size={12} color="var(--color-text-muted)" />
+      {/* Top row: drag handle + ID (left), priority + assignee (right) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={styles.dragHandle}>
+            <GripVertical size={12} color="var(--color-text-muted)" />
+          </div>
+          <Link
+            to={`/project/${projectId}/${ticket.id}`}
+            style={{ ...styles.ticketId, textDecoration: 'none' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {ticket.id}
+          </Link>
         </div>
-        <Link
-          to={`/project/${projectId}/${ticket.id}`}
-          style={{ ...styles.ticketId, textDecoration: 'none' }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {ticket.id}
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <PriorityBadge priority={ticket.priority} />
+          {ticket.assignee && <AssigneeBadge assignee={ticket.assignee} />}
+        </div>
       </div>
 
       {/* Title */}
       <p style={styles.ticketTitle}>{ticket.title}</p>
 
-      {/* Footer: priority + assignee */}
-      <div style={styles.ticketFooter}>
-        <PriorityBadge priority={ticket.priority} />
-        {ticket.assignee && <AssigneeBadge assignee={ticket.assignee} />}
-      </div>
+      {/* Labels */}
+      {ticket.labels.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+          {ticket.labels.map((label) => (
+            <span
+              key={label}
+              style={{
+                fontSize: '11px',
+                fontWeight: '600',
+                padding: '2px 8px',
+                borderRadius: '20px',
+                background: '#CCFBF1',
+                color: 'var(--color-primary)',
+              }}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
