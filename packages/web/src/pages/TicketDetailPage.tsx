@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 import {
   ArrowLeft,
   Loader2,
@@ -480,8 +481,8 @@ function DocTab({
       {/* Content */}
       {mode === 'view' ? (
         content ? (
-          <div id={`doc-view-${filename}`} style={styles.markdownBody}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          <div id={`doc-view-${filename}`} style={styles.markdownBody} className="prose prose-sm loci-markdown">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{content}</ReactMarkdown>
           </div>
         ) : (
           <div style={styles.emptyDoc}>

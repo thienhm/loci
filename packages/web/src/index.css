@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   /* Loci design tokens */
@@ -71,4 +72,119 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+/* ─── Markdown prose overrides (Loci teal palette) ─────────────────────────── */
+.loci-markdown {
+  --tw-prose-body: #134e4a;
+  --tw-prose-headings: #0f4c45;
+  --tw-prose-lead: #5eaba1;
+  --tw-prose-links: #0d9488;
+  --tw-prose-bold: #134e4a;
+  --tw-prose-counters: #5eaba1;
+  --tw-prose-bullets: #0d9488;
+  --tw-prose-hr: #e2e8f0;
+  --tw-prose-quotes: #134e4a;
+  --tw-prose-quote-borders: #0d9488;
+  --tw-prose-captions: #5eaba1;
+  --tw-prose-code: #0f766e;
+  --tw-prose-pre-code: #e2e8f0;
+  --tw-prose-pre-bg: #134e4a;
+  --tw-prose-th-borders: #e2e8f0;
+  --tw-prose-td-borders: #e2e8f0;
+
+  font-family: var(--font-sans);
+  max-width: none;
+}
+
+.loci-markdown a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.loci-markdown a:hover {
+  color: var(--color-primary-hover);
+}
+
+.loci-markdown h1,
+.loci-markdown h2,
+.loci-markdown h3,
+.loci-markdown h4 {
+  font-family: var(--font-sans);
+}
+
+/* ─── Syntax highlighting theme (GitHub-light inspired, teal accents) ───────── */
+.loci-markdown pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0;
+}
+
+.hljs {
+  color: #24292e;
+  background: #134e4a;
+}
+
+.loci-markdown .hljs-comment,
+.loci-markdown .hljs-punctuation {
+  color: #6a737d;
+}
+
+.loci-markdown .hljs-attr,
+.loci-markdown .hljs-attribute,
+.loci-markdown .hljs-meta,
+.loci-markdown .hljs-selector-attr,
+.loci-markdown .hljs-selector-class,
+.loci-markdown .hljs-selector-id {
+  color: #005cc5;
+}
+
+.loci-markdown .hljs-variable,
+.loci-markdown .hljs-literal {
+  color: #e36209;
+}
+
+.loci-markdown .hljs-number,
+.loci-markdown .hljs-doctag,
+.loci-markdown .hljs-keyword,
+.loci-markdown .hljs-template-tag,
+.loci-markdown .hljs-template-variable,
+.loci-markdown .hljs-type,
+.loci-markdown .hljs-title.class_ {
+  color: #d73a49;
+}
+
+.loci-markdown .hljs-title,
+.loci-markdown .hljs-title.class_.inherited__,
+.loci-markdown .hljs-title.function_ {
+  color: #6f42c1;
+}
+
+.loci-markdown .hljs-addition,
+.loci-markdown .hljs-built_in,
+.loci-markdown .hljs-bullet,
+.loci-markdown .hljs-code,
+.loci-markdown .hljs-string,
+.loci-markdown .hljs-symbol {
+  color: #a5d6a7;
+}
+
+.loci-markdown .hljs-section,
+.loci-markdown .hljs-name,
+.loci-markdown .hljs-selector-tag,
+.loci-markdown .hljs-deletion,
+.loci-markdown .hljs-subst {
+  color: #b5e8e0;
+}
+
+.loci-markdown .hljs-emphasis {
+  font-style: italic;
+}
+
+.loci-markdown .hljs-strong {
+  font-weight: bold;
+}
+
+.loci-markdown .hljs-link {
+  text-decoration: underline;
 }
