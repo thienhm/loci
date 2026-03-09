@@ -2,6 +2,7 @@ import { Command } from 'commander'
 import { existsSync, readFileSync, appendFileSync } from 'fs'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
+import { createInterface } from 'readline/promises'
 import {
   findWorkspaceRoot,
   getLociDir,
@@ -62,17 +63,13 @@ write_ticket_doc(id, filename, content)
 `
 }
 
-async function prompt(question: string): Promise<string> {
-  process.stdout.write(question)
-  for await (const line of console) {
-    return line.trim()
-  }
-  return ''
-}
-
-async function promptValidated(question: string, validate: (v: string) => string | null): Promise<string> {
+async function promptValidated(
+  rl: Awaited<ReturnType<typeof createInterface>>,
+  question: string,
+  validate: (v: string) => string | null
+): Promise<string> {
   while (true) {
-    const value = await prompt(question)
+    const value = (await rl.question(question)).trim()
     const error = validate(value)
     if (!error) return value
     console.error(`  Error: ${error}`)
@@ -93,14 +90,18 @@ export const initCommand = new Command('init')
 
     console.log('Initializing Loci project...\n')
 
-    const name = await promptValidated('Project name: ', (v) =>
+    const rl = createInterface({ input: process.stdin, output: process.stdout })
+
+    const name = await promptValidated(rl, 'Project name: ', (v) =>
       v.length === 0 ? 'Name cannot be empty' : null
     )
 
-    const prefix = await promptValidated('Project prefix (2–5 uppercase letters, e.g. APP): ', (v) => {
+    const prefix = await promptValidated(rl, 'Project prefix (2–5 uppercase letters, e.g. APP): ', (v) => {
       if (!/^[A-Z]{2,5}$/.test(v)) return 'Prefix must be 2–5 uppercase letters (A-Z)'
       return null
     })
+
+    rl.close()
 
     // Create project
     const project: Project = {
