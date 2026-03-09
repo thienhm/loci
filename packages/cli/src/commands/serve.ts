@@ -19,6 +19,7 @@ function runBuild(): boolean {
 export const serveCommand = new Command('serve')
   .description('Start the Loci server (REST API + UI) on localhost:3333')
   .option('-p, --port <number>', 'Port to listen on', '3333')
+  .option('--build', 'Rebuild all packages before starting')
   .action(async (options) => {
     const port = parseInt(options.port, 10)
     if (isNaN(port) || port < 1 || port > 65535) {
@@ -26,10 +27,12 @@ export const serveCommand = new Command('serve')
       process.exit(1)
     }
 
-    const ok = runBuild()
-    if (!ok) {
-      console.error('✗ Build failed. Server not started.')
-      process.exit(1)
+    if (options.build) {
+      const ok = runBuild()
+      if (!ok) {
+        console.error('✗ Build failed. Server not started.')
+        process.exit(1)
+      }
     }
 
     await createServer(port)
