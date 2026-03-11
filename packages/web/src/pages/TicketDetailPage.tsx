@@ -80,8 +80,11 @@ export function TicketDetailPage() {
   const patchMutation = useMutation({
     mutationFn: (fields: TicketUpdateInput) =>
       updateTicket(projectId!, ticketId!, fields),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['ticket', projectId, ticketId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', projectId, ticketId] })
+      // Also invalidate the board's ticket list so navigating back shows fresh data
+      queryClient.invalidateQueries({ queryKey: ['tickets', projectId] })
+    },
   })
 
   // ── WAI-ARIA keyboard navigation ──────────────────────────────────────────
