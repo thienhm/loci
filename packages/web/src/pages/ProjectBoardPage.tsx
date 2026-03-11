@@ -768,7 +768,6 @@ const styles = {
     gap: '16px',
     flex: 1,
     overflow: 'auto',
-    alignItems: 'flex-start',
   },
   column: {
     width: '280px',
@@ -778,7 +777,7 @@ const styles = {
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column' as const,
-    maxHeight: 'calc(100vh - 220px)',
+    minHeight: 0,
   },
   columnHeader: {
     display: 'flex',
