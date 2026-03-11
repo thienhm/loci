@@ -7,7 +7,8 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCenter,
+  rectIntersection,
+  useDroppable,
 } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import {
@@ -15,6 +16,7 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable'
+import type { CollisionDetection } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import {
   LayoutGrid,
@@ -109,8 +111,14 @@ export function ProjectBoardPage() {
     const { active, over } = event
     if (!over || active.id === over.id) return
 
-    // Determine target column from the over id
-    const targetStatus = COLUMNS.find((c) => c.id === over.id)?.id
+    // Determine target column — either directly from column id or by finding
+    // which column the hovered ticket belongs to
+    let targetStatus = COLUMNS.find((c) => c.id === over.id)?.id
+    if (!targetStatus) {
+      // Dropped over a ticket card — find its column
+      const overTicket = tickets.find((t) => t.id === over.id)
+      if (overTicket) targetStatus = overTicket.status
+    }
     if (targetStatus) {
       const ticket = tickets.find((t) => t.id === active.id)
       if (ticket && ticket.status !== targetStatus) {
@@ -242,7 +250,7 @@ export function ProjectBoardPage() {
       {viewMode === 'kanban' ? (
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={rectIntersection as CollisionDetection}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
@@ -297,7 +305,7 @@ function KanbanColumn({
   tickets: Ticket[]
   projectId: string
 }) {
-  const { setNodeRef, isOver } = useSortable({ id: column.id })
+  const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
   return (
     <div
