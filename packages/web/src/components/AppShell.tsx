@@ -45,22 +45,7 @@ export function AppShell({ children }: AppShellProps) {
             marginBottom: '8px',
           }}
         >
-          <div
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '8px',
-              background: 'var(--color-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontSize: '14px',
-              fontWeight: '700',
-            }}
-          >
-            L
-          </div>
+          <img src="/favicon.svg" alt="Loci Logo" className="w-7 h-7" style={{ width: '28px', height: '28px', borderRadius: '4px' }} />
           <span style={{ fontWeight: '700', fontSize: '15px', color: 'var(--color-text)' }}>
             Loci
           </span>
