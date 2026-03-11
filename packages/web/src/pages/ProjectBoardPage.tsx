@@ -248,7 +248,9 @@ export function ProjectBoardPage() {
         >
           <div style={styles.kanban}>
             {COLUMNS.map((col) => {
-              const colTickets = tickets.filter((t) => t.status === col.id)
+              const colTickets = tickets
+                .filter((t) => t.status === col.id)
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
               return (
                 <KanbanColumn
                   key={col.id}
