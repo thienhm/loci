@@ -10,7 +10,7 @@ import {
   rectIntersection,
   useDroppable,
 } from '@dnd-kit/core'
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent, DragOverEvent } from '@dnd-kit/core'
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -49,6 +49,7 @@ export function ProjectBoardPage() {
   const queryClient = useQueryClient()
   const [viewMode, setViewMode] = useState<ViewMode>('kanban')
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null)
+  const [overColumnId, setOverColumnId] = useState<TicketStatus | null>(null)
   const [showNewTicket, setShowNewTicket] = useState(false)
   const [newTicketTitle, setNewTicketTitle] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
@@ -106,8 +107,21 @@ export function ProjectBoardPage() {
     if (ticket) setActiveTicket(ticket)
   }
 
+  function handleDragOver(event: DragOverEvent) {
+    const { over } = event
+    if (!over) { setOverColumnId(null); return }
+    // Check if hovering over a column directly
+    const col = COLUMNS.find((c) => c.id === over.id)
+    if (col) { setOverColumnId(col.id); return }
+    // Hovering over a ticket card — resolve its column
+    const overTicket = tickets.find((t) => t.id === over.id)
+    if (overTicket) { setOverColumnId(overTicket.status); return }
+    setOverColumnId(null)
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     setActiveTicket(null)
+    setOverColumnId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -252,6 +266,7 @@ export function ProjectBoardPage() {
           sensors={sensors}
           collisionDetection={rectIntersection as CollisionDetection}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
           <div style={styles.kanban}>
@@ -265,6 +280,7 @@ export function ProjectBoardPage() {
                   column={col}
                   tickets={colTickets}
                   projectId={projectId!}
+                  isHighlighted={overColumnId === col.id}
                 />
               )
             })}
@@ -300,12 +316,14 @@ function KanbanColumn({
   column,
   tickets,
   projectId,
+  isHighlighted,
 }: {
   column: { id: TicketStatus; label: string }
   tickets: Ticket[]
   projectId: string
+  isHighlighted: boolean
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id })
+  const { setNodeRef } = useDroppable({ id: column.id })
 
   return (
     <div
@@ -313,8 +331,8 @@ function KanbanColumn({
       id={`kanban-col-${column.id}`}
       style={{
         ...styles.column,
-        background: isOver ? '#F0FDFA' : 'var(--color-background)',
-        borderColor: isOver ? 'var(--color-primary)' : 'var(--color-border)',
+        background: isHighlighted ? '#F0FDFA' : 'var(--color-background)',
+        borderColor: isHighlighted ? 'var(--color-primary)' : 'var(--color-border)',
         transition: 'border-color 150ms ease, background 150ms ease',
       }}
     >
