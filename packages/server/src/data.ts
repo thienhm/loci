@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { Project, Registry, RegistryEntry, Ticket, TicketWithDocs } from '@loci/shared'
 
@@ -120,4 +120,66 @@ export function readAttachments(workspaceRoot: string, ticketId: string): string
 export function writeAttachments(workspaceRoot: string, ticketId: string, attachments: string[]): void {
   const attachPath = join(getTicketDir(workspaceRoot, ticketId), 'attachments.json')
   writeFileSync(attachPath, JSON.stringify(attachments, null, 2))
+}
+
+// ---------------------------------------------------------------------------
+// File storage helpers
+// ---------------------------------------------------------------------------
+
+export function getFilesDir(workspaceRoot: string, ticketId: string): string {
+  return join(getTicketDir(workspaceRoot, ticketId), 'files')
+}
+
+export interface FileInfo {
+  name: string
+  size: number
+  mimeType: string
+}
+
+export function listFiles(workspaceRoot: string, ticketId: string): FileInfo[] {
+  const dir = getFilesDir(workspaceRoot, ticketId)
+  if (!existsSync(dir)) return []
+
+  const entries = readdirSync(dir, { withFileTypes: true })
+  return entries
+    .filter((e) => e.isFile())
+    .map((e) => {
+      const stat = statSync(join(dir, e.name))
+      return {
+        name: e.name,
+        size: stat.size,
+        mimeType: guessMimeType(e.name),
+      }
+    })
+}
+
+export function resolveUniqueFilename(dir: string, filename: string): string {
+  if (!existsSync(join(dir, filename))) return filename
+
+  const dotIdx = filename.lastIndexOf('.')
+  const base = dotIdx > 0 ? filename.slice(0, dotIdx) : filename
+  const ext = dotIdx > 0 ? filename.slice(dotIdx) : ''
+
+  let counter = 1
+  while (existsSync(join(dir, `${base}(${counter})${ext}`))) {
+    counter++
+  }
+  return `${base}(${counter})${ext}`
+}
+
+export function guessMimeType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase()
+  const map: Record<string, string> = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    svg: 'image/svg+xml',
+    webp: 'image/webp',
+    pdf: 'application/pdf',
+    md: 'text/markdown',
+    txt: 'text/plain',
+    json: 'application/json',
+  }
+  return map[ext ?? ''] ?? 'application/octet-stream'
 }

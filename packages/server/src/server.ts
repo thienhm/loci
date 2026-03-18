@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
+import multipart from '@fastify/multipart'
 import staticPlugin from '@fastify/static'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -19,6 +20,8 @@ export async function createServer(port: number): Promise<void> {
   await app.register(cors, {
     origin: true, // allow all origins in dev
   })
+
+  await app.register(multipart)
 
   // Content-type parser for plain text (used by PUT doc routes)
   app.addContentTypeParser('text/plain', { parseAs: 'string' }, (_req, body, done) => {
