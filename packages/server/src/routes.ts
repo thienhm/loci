@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { randomUUID } from 'crypto'
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { join } from 'path'
 import type { Ticket } from '@loci/shared'
 import {
   readRegistry,
@@ -13,6 +15,10 @@ import {
   writeTicketDoc,
   readAttachments,
   writeAttachments,
+  getFilesDir,
+  listFiles,
+  resolveUniqueFilename,
+  guessMimeType,
 } from './data'
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
@@ -220,4 +226,81 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     writeAttachments(entry.path, req.params.ticketId, req.body)
     return reply.status(204).send()
   })
+
+  // -------------------------------------------------------------------------
+  // Files (upload / download / delete)
+  // -------------------------------------------------------------------------
+
+  // GET /api/projects/:projectId/tickets/:ticketId/files — list files
+  app.get<{ Params: { projectId: string; ticketId: string } }>(
+    '/api/projects/:projectId/tickets/:ticketId/files',
+    async (req, reply) => {
+      const entry = findRegistryEntry(req.params.projectId)
+      if (!entry) return reply.status(404).send({ error: 'Project not found' })
+
+      const files = listFiles(entry.path, req.params.ticketId)
+      return reply.send(files)
+    }
+  )
+
+  // POST /api/projects/:projectId/tickets/:ticketId/files — upload file
+  app.post<{ Params: { projectId: string; ticketId: string } }>(
+    '/api/projects/:projectId/tickets/:ticketId/files',
+    async (req, reply) => {
+      const entry = findRegistryEntry(req.params.projectId)
+      if (!entry) return reply.status(404).send({ error: 'Project not found' })
+
+      const file = await req.file()
+      if (!file) return reply.status(400).send({ error: 'No file uploaded' })
+
+      const buffer = await file.toBuffer()
+      const filename = file.filename
+
+      // .md files are saved as ticket docs
+      if (filename.endsWith('.md')) {
+        writeTicketDoc(entry.path, req.params.ticketId, filename, buffer.toString('utf8'))
+        return reply.status(201).send({ name: filename, type: 'doc' })
+      }
+
+      // All other files go to files/ directory
+      const filesDir = getFilesDir(entry.path, req.params.ticketId)
+      mkdirSync(filesDir, { recursive: true })
+
+      const uniqueName = resolveUniqueFilename(filesDir, filename)
+      writeFileSync(join(filesDir, uniqueName), buffer)
+
+      return reply.status(201).send({ name: uniqueName, type: 'file' })
+    }
+  )
+
+  // GET /api/projects/:projectId/tickets/:ticketId/files/:filename — serve file
+  app.get<{ Params: { projectId: string; ticketId: string; filename: string } }>(
+    '/api/projects/:projectId/tickets/:ticketId/files/:filename',
+    async (req, reply) => {
+      const entry = findRegistryEntry(req.params.projectId)
+      if (!entry) return reply.status(404).send({ error: 'Project not found' })
+
+      const filePath = join(getFilesDir(entry.path, req.params.ticketId), req.params.filename)
+      if (!existsSync(filePath)) return reply.status(404).send({ error: 'File not found' })
+
+      const content = readFileSync(filePath)
+      const mimeType = guessMimeType(req.params.filename)
+      return reply.type(mimeType).send(content)
+    }
+  )
+
+  // DELETE /api/projects/:projectId/tickets/:ticketId/files/:filename — delete file
+  app.delete<{ Params: { projectId: string; ticketId: string; filename: string } }>(
+    '/api/projects/:projectId/tickets/:ticketId/files/:filename',
+    async (req, reply) => {
+      const entry = findRegistryEntry(req.params.projectId)
+      if (!entry) return reply.status(404).send({ error: 'Project not found' })
+
+      const filePath = join(getFilesDir(entry.path, req.params.ticketId), req.params.filename)
+      if (!existsSync(filePath)) return reply.status(404).send({ error: 'File not found' })
+
+      unlinkSync(filePath)
+      return reply.status(204).send()
+    }
+  )
 }

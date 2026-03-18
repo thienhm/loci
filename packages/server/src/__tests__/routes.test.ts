@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'bun:test'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import Fastify, { type FastifyInstance } from 'fastify'
 import cors from '@fastify/cors'
+import multipart from '@fastify/multipart'
 import { registerRoutes } from '../routes'
 import type { Ticket } from '@loci/shared'
 
@@ -42,6 +43,7 @@ function seedTicket(id: string, overrides: Partial<Ticket> = {}) {
 async function buildApp() {
   const instance = Fastify({ logger: false })
   await instance.register(cors, { origin: true })
+  await instance.register(multipart)
   instance.addContentTypeParser('text/plain', { parseAs: 'string' }, (_req, body, done) => {
     done(null, body)
   })
@@ -357,5 +359,124 @@ describe('attachments endpoints', () => {
       body: JSON.stringify({ bad: true }),
     })
     expect(res.statusCode).toBe(400)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// File upload endpoints
+// ---------------------------------------------------------------------------
+
+describe('file upload endpoints', () => {
+  const BASE = (ticketId: string) => `/api/projects/${PROJECT_ID}/tickets/${ticketId}/files`
+
+  function multipartBody(filename: string, contentType: string, fileContent: string) {
+    const boundary = '----FormBoundary'
+    const body = [
+      `--${boundary}`,
+      `Content-Disposition: form-data; name="file"; filename="${filename}"`,
+      `Content-Type: ${contentType}`,
+      '',
+      fileContent,
+      `--${boundary}--`,
+    ].join('\r\n')
+    return { body, boundary }
+  }
+
+  it('POST uploads a file and GET lists it', async () => {
+    seedTicket('TST-001')
+    const { body, boundary } = multipartBody('screenshot.png', 'image/png', 'fake-png-data')
+
+    const postRes = await app.inject({
+      method: 'POST',
+      url: BASE('TST-001'),
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    })
+    expect(postRes.statusCode).toBe(201)
+    expect(postRes.json<any>().name).toBe('screenshot.png')
+
+    const listRes = await app.inject({ method: 'GET', url: BASE('TST-001') })
+    expect(listRes.statusCode).toBe(200)
+    const files = listRes.json<any[]>()
+    expect(files).toHaveLength(1)
+    expect(files[0].name).toBe('screenshot.png')
+    expect(files[0].mimeType).toBe('image/png')
+  })
+
+  it('GET /files/:filename serves the file', async () => {
+    seedTicket('TST-001')
+    const filesDir = join(tmpWorkspace, '.loci', 'tickets', 'TST-001', 'files')
+    mkdirSync(filesDir, { recursive: true })
+    writeFileSync(join(filesDir, 'hello.txt'), 'hello world')
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `${BASE('TST-001')}/hello.txt`,
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toBe('hello world')
+  })
+
+  it('GET /files/:filename returns 404 for missing file', async () => {
+    seedTicket('TST-001')
+    const res = await app.inject({
+      method: 'GET',
+      url: `${BASE('TST-001')}/nope.txt`,
+    })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('DELETE /files/:filename removes the file', async () => {
+    seedTicket('TST-001')
+    const filesDir = join(tmpWorkspace, '.loci', 'tickets', 'TST-001', 'files')
+    mkdirSync(filesDir, { recursive: true })
+    writeFileSync(join(filesDir, 'remove-me.txt'), 'bye')
+
+    const delRes = await app.inject({
+      method: 'DELETE',
+      url: `${BASE('TST-001')}/remove-me.txt`,
+    })
+    expect(delRes.statusCode).toBe(204)
+    expect(existsSync(join(filesDir, 'remove-me.txt'))).toBe(false)
+  })
+
+  it('POST handles filename collision by appending counter', async () => {
+    seedTicket('TST-001')
+    const filesDir = join(tmpWorkspace, '.loci', 'tickets', 'TST-001', 'files')
+    mkdirSync(filesDir, { recursive: true })
+    writeFileSync(join(filesDir, 'report.pdf'), 'existing')
+
+    const { body, boundary } = multipartBody('report.pdf', 'application/pdf', 'new-content')
+    const res = await app.inject({
+      method: 'POST',
+      url: BASE('TST-001'),
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    })
+    expect(res.statusCode).toBe(201)
+    expect(res.json<any>().name).toBe('report(1).pdf')
+    expect(existsSync(join(filesDir, 'report(1).pdf'))).toBe(true)
+  })
+
+  it('POST saves .md uploads as ticket docs', async () => {
+    seedTicket('TST-001')
+    const { body, boundary } = multipartBody('notes.md', 'text/markdown', '# My Notes\n\nSome content.')
+
+    const res = await app.inject({
+      method: 'POST',
+      url: BASE('TST-001'),
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    })
+    expect(res.statusCode).toBe(201)
+    expect(res.json<any>().type).toBe('doc')
+
+    // Verify it's accessible via docs endpoint
+    const docRes = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${PROJECT_ID}/tickets/TST-001/docs/notes.md`,
+    })
+    expect(docRes.statusCode).toBe(200)
+    expect(docRes.body).toContain('# My Notes')
   })
 })
