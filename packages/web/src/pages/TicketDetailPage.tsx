@@ -11,7 +11,10 @@ import {
   Check,
   Pencil,
   Trash2,
-  Plus,
+  Upload,
+  Download,
+  File as FileIcon,
+  X,
   Eye,
   Edit2,
   Save,
@@ -22,10 +25,13 @@ import {
   fetchTicket,
   fetchDoc,
   writeDoc,
-  fetchAttachments,
-  writeAttachments,
+  uploadFile,
+  listFiles,
+  getFileUrl,
+  deleteFile,
   updateTicket,
 } from '../api/client'
+import type { UploadedFile } from '../api/client'
 import type { TicketStatus, TicketPriority, TicketWithDocs, TicketUpdateInput } from '../types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -572,28 +578,74 @@ function AttachmentsTab({
   ticketId: string
 }) {
   const queryClient = useQueryClient()
-  const [newPath, setNewPath] = useState('')
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [uploading, setUploading] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [previewFile, setPreviewFile] = useState<UploadedFile | null>(null)
 
-  const { data: paths = [], isLoading } = useQuery<string[]>({
-    queryKey: ['attachments', projectId, ticketId],
-    queryFn: () => fetchAttachments(projectId, ticketId),
+  const { data: files = [], isLoading } = useQuery<UploadedFile[]>({
+    queryKey: ['files', projectId, ticketId],
+    queryFn: () => listFiles(projectId, ticketId),
   })
 
-  const saveMutation = useMutation({
-    mutationFn: (updated: string[]) => writeAttachments(projectId, ticketId, updated),
+  const deleteMutation = useMutation({
+    mutationFn: (filename: string) => deleteFile(projectId, ticketId, filename),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['attachments', projectId, ticketId] }),
+      queryClient.invalidateQueries({ queryKey: ['files', projectId, ticketId] }),
   })
 
-  function addPath() {
-    const trimmed = newPath.trim()
-    if (!trimmed || paths.includes(trimmed)) return
-    saveMutation.mutate([...paths, trimmed])
-    setNewPath('')
+  async function handleUpload(fileList: FileList | File[]) {
+    const filesToUpload = Array.from(fileList)
+    setUploading((prev) => [...prev, ...filesToUpload.map((f) => f.name)])
+
+    for (const file of filesToUpload) {
+      try {
+        const result = await uploadFile(projectId, ticketId, file)
+        if (result.type === 'doc' || result.savedAsDoc) {
+          queryClient.invalidateQueries({ queryKey: ['ticket', projectId, ticketId] })
+        }
+      } catch {
+        // Upload failed — silently skip
+      }
+    }
+
+    setUploading([])
+    queryClient.invalidateQueries({ queryKey: ['files', projectId, ticketId] })
   }
 
-  function removePath(p: string) {
-    saveMutation.mutate(paths.filter((x) => x !== p))
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setIsDragOver(false)
+    if (e.dataTransfer.files.length > 0) {
+      handleUpload(e.dataTransfer.files)
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files.length > 0) {
+      handleUpload(e.target.files)
+      e.target.value = ''
+    }
+  }
+
+  function isPreviewable(name: string): boolean {
+    return /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(name)
+  }
+
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   if (isLoading) {
@@ -606,51 +658,178 @@ function AttachmentsTab({
 
   return (
     <div style={styles.attachmentsPane}>
-      <p style={styles.attachmentsHint}>
-        Workspace-relative paths to files relevant to this ticket.
-      </p>
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        onChange={handleFileSelect}
+        style={{ display: 'none' }}
+      />
 
-      {/* Add input */}
-      <div style={styles.addRow}>
-        <input
-          id="attachment-path-input"
-          type="text"
-          value={newPath}
-          onChange={(e) => setNewPath(e.target.value)}
-          placeholder="e.g. packages/web/src/pages/TicketDetailPage.tsx"
-          onKeyDown={(e) => { if (e.key === 'Enter') addPath() }}
-          style={styles.attachmentInput}
-        />
-        <button
-          id="add-attachment-btn"
-          onClick={addPath}
-          disabled={!newPath.trim() || saveMutation.isPending}
-          style={{ ...styles.toolbarBtn, ...styles.toolbarBtnPrimary }}
-        >
-          <Plus size={13} />
-          Add
-        </button>
+      {/* Drop zone */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        style={{
+          ...styles.dropZone,
+          borderColor: isDragOver ? 'var(--color-primary)' : 'var(--color-border)',
+          background: isDragOver ? '#F0FDFA' : 'var(--color-background)',
+        }}
+      >
+        <Upload size={20} color={isDragOver ? 'var(--color-primary)' : 'var(--color-text-muted)'} />
+        <span style={{ fontSize: '13px', color: isDragOver ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: '500' }}>
+          Drop files here or click to browse
+        </span>
+        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+          .md files will be saved as document tabs
+        </span>
       </div>
 
-      {/* List */}
-      {paths.length === 0 ? (
-        <div style={styles.emptyDoc}>No attachments yet.</div>
+      {/* Uploading indicators */}
+      {uploading.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+          <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+          Uploading {uploading.length} file{uploading.length > 1 ? 's' : ''}…
+        </div>
+      )}
+
+      {/* File grid */}
+      {files.length === 0 && uploading.length === 0 ? (
+        <div style={styles.emptyDoc}>No files attached yet.</div>
       ) : (
-        <ul style={styles.attachmentList}>
-          {paths.map((p) => (
-            <li key={p} style={styles.attachmentItem}>
-              <span style={styles.attachmentPath}>{p}</span>
-              <button
-                id={`remove-attachment-${p}`}
-                onClick={() => removePath(p)}
-                style={styles.iconBtn}
-                title="Remove"
-              >
-                <Trash2 size={13} color="var(--color-priority-high, #EF4444)" />
-              </button>
-            </li>
+        <div style={styles.fileGrid}>
+          {files.map((file) => (
+            <div
+              key={file.name}
+              style={{ ...styles.fileCard, cursor: 'pointer' }}
+              onClick={() => setPreviewFile(file)}
+            >
+              {/* Preview or icon */}
+              {isPreviewable(file.name) ? (
+                <div style={styles.filePreview}>
+                  <img
+                    src={getFileUrl(projectId, ticketId, file.name)}
+                    alt={file.name}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px' }}
+                    onError={(e) => {
+                      const target = e.currentTarget
+                      target.style.display = 'none'
+                      if (target.parentElement) {
+                        target.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%"><span style="color:var(--color-text-muted);font-size:11px">Preview failed</span></div>'
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div style={{ ...styles.filePreview, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FileIcon size={28} color="var(--color-text-muted)" />
+                </div>
+              )}
+
+              {/* File info */}
+              <div style={styles.fileInfo}>
+                <span style={styles.fileName} title={file.name}>{file.name}</span>
+                <span style={styles.fileSize}>{formatSize(file.size)}</span>
+              </div>
+
+              {/* Actions */}
+              <div style={styles.fileActions}>
+                <a
+                  href={getFileUrl(projectId, ticketId, file.name)}
+                  download={file.name}
+                  title="Download"
+                  style={styles.iconBtn}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Download size={13} color="var(--color-text-muted)" />
+                </a>
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(file.name) }}
+                  disabled={deleteMutation.isPending}
+                  title="Delete"
+                  style={styles.iconBtn}
+                >
+                  <Trash2 size={13} color="var(--color-priority-high, #EF4444)" />
+                </button>
+              </div>
+            </div>
           ))}
-        </ul>
+        </div>
+      )}
+
+      {/* Preview modal */}
+      {previewFile && (
+        <div
+          style={styles.modalOverlay}
+          onClick={() => setPreviewFile(null)}
+        >
+          <div
+            style={styles.modalContent}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={styles.modalHeader}>
+              <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--color-text)' }}>
+                {previewFile.name}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                  {formatSize(previewFile.size)}
+                </span>
+                <button onClick={() => setPreviewFile(null)} style={styles.iconBtn}>
+                  <X size={16} color="var(--color-text-muted)" />
+                </button>
+              </div>
+            </div>
+
+            <div style={styles.modalBody}>
+              {isPreviewable(previewFile.name) ? (
+                <img
+                  src={getFileUrl(projectId, ticketId, previewFile.name)}
+                  alt={previewFile.name}
+                  style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '4px' }}
+                  onError={(e) => {
+                    const target = e.currentTarget
+                    target.style.display = 'none'
+                    if (target.parentElement) {
+                      target.parentElement.innerHTML = '<div style="padding:40px;text-align:center;color:var(--color-text-muted)">Preview failed</div>'
+                    }
+                  }}
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '40px' }}>
+                  <FileIcon size={48} color="var(--color-text-muted)" />
+                  <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>
+                    No preview available for this file type
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div style={styles.modalFooter}>
+              <a
+                href={getFileUrl(projectId, ticketId, previewFile.name)}
+                download={previewFile.name}
+                style={{ ...styles.toolbarBtn, ...styles.toolbarBtnPrimary, textDecoration: 'none' }}
+              >
+                <Download size={13} />
+                Download
+              </a>
+              <button
+                onClick={() => {
+                  deleteMutation.mutate(previewFile.name)
+                  setPreviewFile(null)
+                }}
+                style={{ ...styles.toolbarBtn, color: 'var(--color-priority-high, #EF4444)', borderColor: 'var(--color-priority-high, #EF4444)' }}
+              >
+                <Trash2 size={13} />
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -905,48 +1084,113 @@ const styles = {
     padding: '20px 24px',
     gap: '16px',
   },
-  attachmentsHint: {
-    fontSize: '12px',
-    color: 'var(--color-text-muted)',
-    margin: 0,
-  },
-  addRow: {
-    display: 'flex',
-    gap: '8px',
-    alignItems: 'center',
-  },
-  attachmentInput: {
-    flex: 1,
-    padding: '6px 10px',
-    fontSize: '13px',
-    fontFamily: 'monospace',
-    border: '1px solid var(--color-border)',
-    borderRadius: '5px',
-    background: 'var(--color-background)',
-    color: 'var(--color-text)',
-    outline: 'none',
-  },
-  attachmentList: {
-    listStyle: 'none',
-    margin: 0,
-    padding: 0,
+  dropZone: {
+    border: '2px dashed var(--color-border)',
+    borderRadius: '10px',
+    padding: '28px 20px',
     display: 'flex',
     flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: '8px',
+    cursor: 'pointer',
+    transition: 'border-color 150ms ease, background 150ms ease',
+    flexShrink: 0,
   },
-  attachmentItem: {
+  fileGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+    gap: '12px',
+  },
+  fileCard: {
+    background: 'var(--color-background)',
+    border: '1px solid var(--color-border)',
+    borderRadius: '8px',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    transition: 'box-shadow 150ms ease',
+  },
+  filePreview: {
+    height: '120px',
+    overflow: 'hidden',
+    background: 'var(--color-surface)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '8px',
+  },
+  fileInfo: {
+    padding: '8px 10px 4px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  },
+  fileName: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: 'var(--color-text)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const,
+  },
+  fileSize: {
+    fontSize: '11px',
+    color: 'var(--color-text-muted)',
+  },
+  fileActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '4px',
+    padding: '4px 8px 8px',
+  },
+  modalOverlay: {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modalContent: {
+    background: 'var(--color-surface)',
+    borderRadius: '12px',
+    border: '1px solid var(--color-border)',
+    maxWidth: '80vw',
+    maxHeight: '85vh',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    overflow: 'hidden',
+    boxShadow: '0 16px 48px rgba(0, 0, 0, 0.2)',
+    minWidth: '320px',
+  },
+  modalHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '8px 12px',
-    background: 'var(--color-background)',
-    border: '1px solid var(--color-border)',
-    borderRadius: '6px',
+    padding: '12px 16px',
+    borderBottom: '1px solid var(--color-border)',
+    flexShrink: 0,
   },
-  attachmentPath: {
-    fontSize: '12px',
-    fontFamily: 'monospace',
-    color: 'var(--color-text)',
-    wordBreak: 'break-all' as const,
+  modalBody: {
+    flex: 1,
+    overflow: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '16px',
+    background: 'var(--color-background)',
+  },
+  modalFooter: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '8px',
+    padding: '12px 16px',
+    borderTop: '1px solid var(--color-border)',
+    flexShrink: 0,
   },
 }
