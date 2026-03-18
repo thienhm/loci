@@ -154,7 +154,7 @@ export function ProjectBoardPage() {
   )
 
   function handleDragStart(event: DragStartEvent) {
-    const ticket = tickets.find((t) => t.id === event.active.id)
+    const ticket = filteredTickets.find((t) => t.id === event.active.id)
     if (ticket) setActiveTicket(ticket)
   }
 
@@ -165,7 +165,7 @@ export function ProjectBoardPage() {
     const col = COLUMNS.find((c) => c.id === over.id)
     if (col) { setOverColumnId(col.id); return }
     // Hovering over a ticket card — resolve its column
-    const overTicket = tickets.find((t) => t.id === over.id)
+    const overTicket = filteredTickets.find((t) => t.id === over.id)
     if (overTicket) { setOverColumnId(overTicket.status); return }
     setOverColumnId(null)
   }
@@ -181,11 +181,11 @@ export function ProjectBoardPage() {
     let targetStatus = COLUMNS.find((c) => c.id === over.id)?.id
     if (!targetStatus) {
       // Dropped over a ticket card — find its column
-      const overTicket = tickets.find((t) => t.id === over.id)
+      const overTicket = filteredTickets.find((t) => t.id === over.id)
       if (overTicket) targetStatus = overTicket.status
     }
     if (targetStatus) {
-      const ticket = tickets.find((t) => t.id === active.id)
+      const ticket = filteredTickets.find((t) => t.id === active.id)
       if (ticket && ticket.status !== targetStatus) {
         updateMutation.mutate({ ticketId: String(active.id), status: targetStatus })
       }
