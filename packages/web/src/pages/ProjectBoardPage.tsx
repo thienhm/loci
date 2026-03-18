@@ -129,10 +129,9 @@ export function ProjectBoardPage() {
     },
   })
 
-  // Show all tickets, archived sorted to bottom. Toggle hides/shows archived.
+  // Toggle hides/shows archived tickets.
   const visibleTickets = useMemo(() => {
-    const filtered = showArchived ? tickets : tickets.filter(t => !t.archived)
-    return [...filtered].sort((a, b) => Number(a.archived ?? false) - Number(b.archived ?? false))
+    return showArchived ? tickets : tickets.filter(t => !t.archived)
   }, [tickets, showArchived])
 
   function toggleSelect(ticketId: string) {
@@ -338,7 +337,13 @@ export function ProjectBoardPage() {
             {COLUMNS.map((col) => {
               const colTickets = visibleTickets
                 .filter((t) => t.status === col.id)
-                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                .sort((a, b) => {
+                  // Archived tickets go to bottom
+                  const aArch = a.archived ? 1 : 0
+                  const bArch = b.archived ? 1 : 0
+                  if (aArch !== bArch) return aArch - bArch
+                  return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+                })
               return (
                 <KanbanColumn
                   key={col.id}
@@ -628,6 +633,10 @@ function TicketTable({
   onToggleSelect: (ticketId: string) => void
 }) {
   const sorted = [...tickets].sort((a, b) => {
+    // Archived tickets always go to bottom
+    const aArch = a.archived ? 1 : 0
+    const bArch = b.archived ? 1 : 0
+    if (aArch !== bArch) return aArch - bArch
     const mul = sortDir === 'asc' ? 1 : -1
     const av = a[sortField as keyof Ticket] ?? ''
     const bv = b[sortField as keyof Ticket] ?? ''
