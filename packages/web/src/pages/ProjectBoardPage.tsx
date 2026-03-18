@@ -27,6 +27,9 @@ import {
   User,
   Bot,
   GripVertical,
+  Archive,
+  CheckSquare,
+  X,
 } from 'lucide-react'
 import { fetchProject, fetchTickets, updateTicket, createTicket } from '../api/client'
 import { useSSE } from '../hooks/useSSE'
@@ -63,6 +66,9 @@ export function ProjectBoardPage() {
   const [newTicketTitle, setNewTicketTitle] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [showArchived, setShowArchived] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set())
 
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeState(mode)
@@ -92,26 +98,47 @@ export function ProjectBoardPage() {
   })
 
   const { data: tickets = [], isLoading: ticketsLoading, error } = useQuery<Ticket[]>({
-    queryKey: ['tickets', projectId],
-    queryFn: () => fetchTickets(projectId!),
+    queryKey: ['tickets', projectId, showArchived ? 'all' : 'active'],
+    queryFn: () => fetchTickets(projectId!, showArchived ? { archived: 'all' } : undefined),
     enabled: !!projectId,
   })
+
+  const invalidateTickets = () => queryClient.invalidateQueries({ queryKey: ['tickets', projectId] })
 
   const updateMutation = useMutation({
     mutationFn: ({ ticketId, status }: { ticketId: string; status: TicketStatus }) =>
       updateTicket(projectId!, ticketId, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tickets', projectId] }),
+    onSuccess: invalidateTickets,
   })
 
   const createMutation = useMutation({
     mutationFn: (title: string) => createTicket(projectId!, { title }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets', projectId] })
+      invalidateTickets()
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       setNewTicketTitle('')
       setShowNewTicket(false)
     },
   })
+
+  const bulkArchiveMutation = useMutation({
+    mutationFn: async (ticketIds: string[]) => {
+      await Promise.all(ticketIds.map(id => updateTicket(projectId!, id, { archived: true })))
+    },
+    onSuccess: () => {
+      invalidateTickets()
+      setSelectedTickets(new Set())
+    },
+  })
+
+  function toggleSelect(ticketId: string) {
+    setSelectedTickets(prev => {
+      const next = new Set(prev)
+      if (next.has(ticketId)) next.delete(ticketId)
+      else next.add(ticketId)
+      return next
+    })
+  }
 
   // dnd-kit sensors
   const sensors = useSensors(
@@ -223,6 +250,24 @@ export function ProjectBoardPage() {
             New Ticket
           </button>
 
+          {/* Show archived toggle */}
+          <ToggleButton
+            id="toggle-archived-btn"
+            active={showArchived}
+            onClick={() => { setShowArchived(v => !v); setSelectedTickets(new Set()) }}
+            icon={<Archive size={14} />}
+            label="Archived"
+          />
+
+          {/* Select mode toggle */}
+          <ToggleButton
+            id="toggle-select-btn"
+            active={selectMode}
+            onClick={() => { setSelectMode(v => !v); setSelectedTickets(new Set()) }}
+            icon={<CheckSquare size={14} />}
+            label="Select"
+          />
+
           {/* View toggle */}
           <div style={styles.viewToggle}>
             <ToggleButton
@@ -289,7 +334,13 @@ export function ProjectBoardPage() {
             {COLUMNS.map((col) => {
               const colTickets = tickets
                 .filter((t) => t.status === col.id)
-                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                .sort((a, b) => {
+                  // Archived tickets go to bottom
+                  const aArch = a.archived ? 1 : 0
+                  const bArch = b.archived ? 1 : 0
+                  if (aArch !== bArch) return aArch - bArch
+                  return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+                })
               return (
                 <KanbanColumn
                   key={col.id}
@@ -297,6 +348,9 @@ export function ProjectBoardPage() {
                   tickets={colTickets}
                   projectId={projectId!}
                   isHighlighted={overColumnId === col.id}
+                  selectMode={selectMode}
+                  selectedTickets={selectedTickets}
+                  onToggleSelect={toggleSelect}
                 />
               )
             })}
@@ -318,7 +372,32 @@ export function ProjectBoardPage() {
             if (field === sortField) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
             else { setSortField(field); setSortDir('asc') }
           }}
+          selectMode={selectMode}
+          selectedTickets={selectedTickets}
+          onToggleSelect={toggleSelect}
         />
+      )}
+
+      {/* Floating bulk action bar */}
+      {selectedTickets.size > 0 && (
+        <div style={styles.floatingBar}>
+          <span>{selectedTickets.size} selected</span>
+          <button
+            onClick={() => bulkArchiveMutation.mutate([...selectedTickets])}
+            disabled={bulkArchiveMutation.isPending}
+            style={styles.floatingBarBtn}
+          >
+            <Archive size={14} />
+            {bulkArchiveMutation.isPending ? 'Archiving…' : 'Archive'}
+          </button>
+          <button
+            onClick={() => setSelectedTickets(new Set())}
+            style={{ ...styles.floatingBarBtn, background: 'rgba(255,255,255,0.15)' }}
+          >
+            <X size={14} />
+            Cancel
+          </button>
+        </div>
       )}
     </div>
   )
@@ -333,11 +412,17 @@ function KanbanColumn({
   tickets,
   projectId,
   isHighlighted,
+  selectMode,
+  selectedTickets,
+  onToggleSelect,
 }: {
   column: { id: TicketStatus; label: string }
   tickets: Ticket[]
   projectId: string
   isHighlighted: boolean
+  selectMode: boolean
+  selectedTickets: Set<string>
+  onToggleSelect: (ticketId: string) => void
 }) {
   const { setNodeRef } = useDroppable({ id: column.id })
 
@@ -365,7 +450,14 @@ function KanbanColumn({
       <SortableContext items={tickets.map(t => t.id)} strategy={verticalListSortingStrategy}>
         <div style={styles.columnBody}>
           {tickets.map((ticket) => (
-            <SortableTicketCard key={ticket.id} ticket={ticket} projectId={projectId} />
+            <SortableTicketCard
+              key={ticket.id}
+              ticket={ticket}
+              projectId={projectId}
+              selectMode={selectMode}
+              isSelected={selectedTickets.has(ticket.id)}
+              onToggleSelect={onToggleSelect}
+            />
           ))}
 
           {tickets.length === 0 && (
@@ -383,7 +475,19 @@ function KanbanColumn({
 // Sortable ticket card wrapper
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SortableTicketCard({ ticket, projectId }: { ticket: Ticket; projectId: string }) {
+function SortableTicketCard({
+  ticket,
+  projectId,
+  selectMode,
+  isSelected,
+  onToggleSelect,
+}: {
+  ticket: Ticket
+  projectId: string
+  selectMode: boolean
+  isSelected: boolean
+  onToggleSelect: (ticketId: string) => void
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
   })
@@ -391,12 +495,19 @@ function SortableTicketCard({ ticket, projectId }: { ticket: Ticket; projectId: 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.3 : 1,
+    opacity: isDragging ? 0.3 : ticket.archived ? 0.5 : 1,
   }
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-      <TicketCard ticket={ticket} projectId={projectId} dragHandleProps={listeners} />
+      <TicketCard
+        ticket={ticket}
+        projectId={projectId}
+        dragHandleProps={listeners}
+        selectMode={selectMode}
+        isSelected={isSelected}
+        onToggleSelect={onToggleSelect}
+      />
     </div>
   )
 }
@@ -410,11 +521,17 @@ function TicketCard({
   projectId,
   isDragging,
   dragHandleProps,
+  selectMode,
+  isSelected,
+  onToggleSelect,
 }: {
   ticket: Ticket
   projectId: string
   isDragging?: boolean
   dragHandleProps?: Record<string, unknown>
+  selectMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: (ticketId: string) => void
 }) {
   return (
     <div
@@ -427,11 +544,21 @@ function TicketCard({
           : '0 1px 3px rgba(0,0,0,0.06)',
         cursor: isDragging ? 'grabbing' : 'grab',
         transform: isDragging ? 'rotate(2deg)' : 'none',
+        ...(isSelected ? { borderColor: 'var(--color-primary)', background: '#F0FDFA' } : {}),
       }}
     >
-      {/* Top row: drag handle + ID (left), priority + assignee (right) */}
+      {/* Top row: checkbox + drag handle + ID (left), priority + assignee (right) */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {selectMode && onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={isSelected ?? false}
+              onChange={(e) => { e.stopPropagation(); onToggleSelect(ticket.id) }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ accentColor: 'var(--color-primary)', cursor: 'pointer', margin: 0 }}
+            />
+          )}
           <div style={styles.dragHandle}>
             <GripVertical size={12} color="var(--color-text-muted)" />
           </div>
@@ -442,6 +569,9 @@ function TicketCard({
           >
             {ticket.id}
           </Link>
+          {ticket.archived && (
+            <span style={styles.archivedBadge}>Archived</span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <PriorityBadge priority={ticket.priority} />
@@ -486,14 +616,24 @@ function TicketTable({
   sortField,
   sortDir,
   onSort,
+  selectMode,
+  selectedTickets,
+  onToggleSelect,
 }: {
   tickets: Ticket[]
   projectId: string
   sortField: SortField
   sortDir: SortDir
   onSort: (field: SortField) => void
+  selectMode: boolean
+  selectedTickets: Set<string>
+  onToggleSelect: (ticketId: string) => void
 }) {
   const sorted = [...tickets].sort((a, b) => {
+    // Archived tickets always go to bottom
+    const aArch = a.archived ? 1 : 0
+    const bArch = b.archived ? 1 : 0
+    if (aArch !== bArch) return aArch - bArch
     const mul = sortDir === 'asc' ? 1 : -1
     const av = a[sortField as keyof Ticket] ?? ''
     const bv = b[sortField as keyof Ticket] ?? ''
@@ -510,6 +650,7 @@ function TicketTable({
       <table style={styles.table}>
         <thead>
           <tr>
+            {selectMode && <th style={{ ...styles.th, width: '36px', cursor: 'default' }}></th>}
             {([
               ['id', 'ID'],
               ['title', 'Title'],
@@ -534,17 +675,34 @@ function TicketTable({
             <tr
               key={ticket.id}
               id={`ticket-row-${ticket.id}`}
-              style={styles.tr}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#F8FFFE')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '')}
+              style={{
+                ...styles.tr,
+                opacity: ticket.archived ? 0.5 : 1,
+                ...(selectedTickets.has(ticket.id) ? { background: '#F0FDFA' } : {}),
+              }}
+              onMouseEnter={(e) => { if (!selectedTickets.has(ticket.id)) e.currentTarget.style.background = '#F8FFFE' }}
+              onMouseLeave={(e) => { if (!selectedTickets.has(ticket.id)) e.currentTarget.style.background = '' }}
             >
+              {selectMode && (
+                <td style={styles.td}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTickets.has(ticket.id)}
+                    onChange={() => onToggleSelect(ticket.id)}
+                    style={{ accentColor: 'var(--color-primary)', cursor: 'pointer', margin: 0 }}
+                  />
+                </td>
+              )}
               <td style={styles.td}>
-                <Link
-                  to={`/project/${projectId}/${ticket.id}`}
-                  style={{ ...styles.ticketId, textDecoration: 'none' }}
-                >
-                  {ticket.id}
-                </Link>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Link
+                    to={`/project/${projectId}/${ticket.id}`}
+                    style={{ ...styles.ticketId, textDecoration: 'none' }}
+                  >
+                    {ticket.id}
+                  </Link>
+                  {ticket.archived && <span style={styles.archivedBadge}>Archived</span>}
+                </div>
               </td>
               <td style={{ ...styles.td, maxWidth: '300px' }}>
                 <span style={{ fontSize: '13px', color: 'var(--color-text)', fontWeight: '500' }}>
@@ -952,5 +1110,46 @@ const styles = {
     justifyContent: 'center',
     height: '100%',
     gap: '8px',
+  },
+  archivedBadge: {
+    fontSize: '9px',
+    fontWeight: '700',
+    padding: '1px 5px',
+    borderRadius: '3px',
+    background: '#FEF3C7',
+    color: '#92400E',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+  },
+  floatingBar: {
+    position: 'fixed' as const,
+    bottom: '24px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 20px',
+    background: 'var(--color-text)',
+    color: '#fff',
+    borderRadius: '12px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+    zIndex: 1000,
+    fontSize: '13px',
+    fontWeight: '600',
+  },
+  floatingBarBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '5px',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    border: 'none',
+    background: 'var(--color-primary)',
+    color: '#fff',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
   },
 } as const

@@ -15,6 +15,8 @@ import {
   Eye,
   Edit2,
   Save,
+  Archive,
+  ArchiveRestore,
 } from 'lucide-react'
 import {
   fetchTicket,
@@ -242,6 +244,45 @@ function TicketHeader({
 
   return (
     <div style={styles.header}>
+      {/* Archived banner */}
+      {ticket.archived && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '8px 12px',
+          background: '#FEF3C7',
+          borderRadius: '6px',
+          fontSize: '12px',
+          fontWeight: '600',
+          color: '#92400E',
+        }}>
+          <Archive size={14} />
+          This ticket is archived
+          <button
+            onClick={() => onPatch({ archived: false })}
+            style={{
+              marginLeft: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '3px 10px',
+              borderRadius: '4px',
+              border: '1px solid #92400E',
+              background: 'transparent',
+              color: '#92400E',
+              fontSize: '11px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            <ArchiveRestore size={12} />
+            Unarchive
+          </button>
+        </div>
+      )}
+
       {/* Title row */}
       <div style={styles.titleRow}>
         <span style={styles.ticketId}>{ticket.id}</span>
@@ -272,6 +313,16 @@ function TicketHeader({
             >
               <Pencil size={13} color="var(--color-text-muted)" />
             </button>
+            {!ticket.archived && (
+              <button
+                id="archive-ticket-btn"
+                onClick={() => onPatch({ archived: true })}
+                title="Archive ticket"
+                style={styles.iconBtn}
+              >
+                <Archive size={14} color="var(--color-text-muted)" />
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -22,6 +22,7 @@ export interface Ticket {
   labels: string[]
   assignee: string | null
   progress: number
+  archived: boolean
   createdAt: string
   updatedAt: string
 }
@@ -40,6 +41,7 @@ export interface TicketUpdateInput {
   labels?: string[]
   assignee?: string | null
   progress?: number
+  archived?: boolean
 }
 
 // Ticket counts per status — used in dashboard project cards

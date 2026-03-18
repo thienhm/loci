@@ -106,14 +106,15 @@ export function createMcpServer(): McpServer {
   server.registerTool(
     'list_tickets',
     {
-      description: 'List tickets, optionally filtered by project, status, or assignee',
+      description: 'List tickets, optionally filtered by project, status, assignee, or archived state',
       inputSchema: z.object({
         project_id: z.string().optional().describe('Project UUID (omit for all projects)'),
         status: z.enum(['todo', 'in_progress', 'in_review', 'done']).optional(),
         assignee: z.string().optional(),
+        archived: z.boolean().optional().describe('Filter by archived state (omit to exclude archived)'),
       }),
     },
-    async ({ project_id, status, assignee }) => {
+    async ({ project_id, status, assignee, archived }) => {
       const registry = readRegistry()
       const entries = project_id
         ? registry.projects.filter((p) => p.id === project_id)
@@ -126,6 +127,16 @@ export function createMcpServer(): McpServer {
 
       if (status) tickets = tickets.filter((t) => t.status === status)
       if (assignee) tickets = tickets.filter((t) => t.assignee === assignee)
+      // Default: exclude archived unless explicitly requested
+      if (archived === true) {
+        tickets = tickets.filter((t) => t.archived === true)
+      } else if (archived !== undefined) {
+        // archived === false: include only non-archived
+        tickets = tickets.filter((t) => t.archived !== true)
+      } else {
+        // archived === undefined: exclude archived by default
+        tickets = tickets.filter((t) => t.archived !== true)
+      }
 
       return jsonResult(tickets)
     }
@@ -196,6 +207,7 @@ export function createMcpServer(): McpServer {
         labels: labels ?? [],
         assignee: assignee ?? null,
         progress: 0,
+        archived: false,
         createdAt: now,
         updatedAt: now,
       }
@@ -218,6 +230,7 @@ export function createMcpServer(): McpServer {
           labels: z.array(z.string()).optional(),
           assignee: z.string().nullable().optional(),
           progress: z.number().min(0).max(100).optional(),
+          archived: z.boolean().optional(),
         }),
       }),
     },
