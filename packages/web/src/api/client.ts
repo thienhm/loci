@@ -121,3 +121,54 @@ export async function writeAttachments(
   if (!res.ok) throw new Error(`PUT attachments failed: ${res.status}`)
   return res.json()
 }
+
+// File uploads
+export interface UploadedFile {
+  name: string
+  size: number
+  mimeType: string
+  savedAsDoc?: boolean
+  type?: string
+}
+
+export async function uploadFile(
+  projectId: string,
+  ticketId: string,
+  file: File
+): Promise<UploadedFile> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`${BASE}/projects/${projectId}/tickets/${ticketId}/files`, {
+    method: 'POST',
+    body: form,
+  })
+  if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
+  return res.json()
+}
+
+export async function listFiles(
+  projectId: string,
+  ticketId: string
+): Promise<UploadedFile[]> {
+  return get<UploadedFile[]>(`/projects/${projectId}/tickets/${ticketId}/files`)
+}
+
+export function getFileUrl(
+  projectId: string,
+  ticketId: string,
+  filename: string
+): string {
+  return `${BASE}/projects/${projectId}/tickets/${ticketId}/files/${encodeURIComponent(filename)}`
+}
+
+export async function deleteFile(
+  projectId: string,
+  ticketId: string,
+  filename: string
+): Promise<void> {
+  const res = await fetch(
+    `${BASE}/projects/${projectId}/tickets/${ticketId}/files/${encodeURIComponent(filename)}`,
+    { method: 'DELETE' }
+  )
+  if (!res.ok) throw new Error(`Delete failed: ${res.status}`)
+}
