@@ -81,12 +81,10 @@ Skills live in `.agent/skills/<skill-name>/SKILL.md`. Use `view_file` to read th
 
 ## Loci Task Management
 
-> **MANDATORY**: Before ANY interaction with Loci tickets, you MUST read `LOCI.md` in the project root. This is non-negotiable.
+**Project: Loci | Prefix: LCI | project_id: `00fc699f-bc78-4d49-992b-ddf2a1542e48`**
 
-### Hard Rules (always enforced)
-- **Project Guard**: Only manage tickets for the **Loci** project (prefix: `LCI`). Never read, list, or update tickets from other projects.
-- When listing tickets, ALWAYS filter by the Loci project ID. Never call `list_tickets()` without a `project_id` filter.
-- MCP server: http://localhost:3333/mcp
+- ALWAYS use `project_id: "00fc699f-bc78-4d49-992b-ddf2a1542e48"` when creating tickets — never omit it or use another project
+- Never read or manage tickets from other projects (TST, GRP, PDC,...)
 
-### Full Workflow
-See `LOCI.md` for the complete ticket workflow (starting tickets, completing tickets, document conventions, assignee format, etc.).
+See LOCI.md for full workflow instructions.
+MCP server: http://localhost:3333/mcp
