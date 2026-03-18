@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -44,16 +44,32 @@ const COLUMNS: { id: TicketStatus; label: string }[] = [
   { id: 'done', label: 'Done' },
 ]
 
+function getStoredViewMode(projectId: string | undefined): ViewMode {
+  if (!projectId) return 'kanban'
+  try {
+    const stored = localStorage.getItem(`loci:viewMode:${projectId}`)
+    if (stored === 'kanban' || stored === 'list') return stored
+  } catch { /* localStorage unavailable */ }
+  return 'kanban'
+}
+
 export function ProjectBoardPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const queryClient = useQueryClient()
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban')
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => getStoredViewMode(projectId))
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null)
   const [overColumnId, setOverColumnId] = useState<TicketStatus | null>(null)
   const [showNewTicket, setShowNewTicket] = useState(false)
   const [newTicketTitle, setNewTicketTitle] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+
+  const setViewMode = useCallback((mode: ViewMode) => {
+    setViewModeState(mode)
+    if (projectId) {
+      try { localStorage.setItem(`loci:viewMode:${projectId}`, mode) } catch { /* noop */ }
+    }
+  }, [projectId])
 
   // Auto-refresh board when server emits SSE change events
   useSSE(projectId)
