@@ -100,7 +100,7 @@ export function FilterBar({
     <div style={styles.bar}>
       {/* Search */}
       <div style={styles.searchWrapper}>
-        <Search size={14} color="var(--color-text-muted)" />
+        <Search size={16} color="var(--color-text-muted)" />
         <input
           id="filter-search"
           type="text"
@@ -292,7 +292,7 @@ const styles = {
   bar: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
     flexWrap: 'wrap' as const,
     flexShrink: 0,
   },
@@ -300,18 +300,18 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    padding: '5px 10px',
+    padding: '8px 12px',
     border: '1px solid var(--color-border)',
     borderRadius: '6px',
     background: 'var(--color-surface)',
-    flex: '1 1 180px',
-    maxWidth: '320px',
+    flex: '1 1 200px',
+    maxWidth: '360px',
   },
   searchInput: {
     flex: 1,
     border: 'none',
     outline: 'none',
-    fontSize: '12px',
+    fontSize: '13px',
     color: 'var(--color-text)',
     background: 'transparent',
     fontFamily: 'inherit',
@@ -329,8 +329,8 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '5px 10px',
-    fontSize: '12px',
+    padding: '8px 12px',
+    fontSize: '13px',
     fontWeight: '500' as const,
     color: 'var(--color-text-muted)',
     background: 'var(--color-surface)',
@@ -365,8 +365,8 @@ const styles = {
   dropdownItem: {
     display: 'block',
     width: '100%',
-    padding: '7px 12px',
-    fontSize: '12px',
+    padding: '8px 14px',
+    fontSize: '13px',
     fontWeight: '400' as const,
     color: 'var(--color-text)',
     background: 'transparent',
@@ -380,8 +380,8 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '5px 10px',
-    fontSize: '11px',
+    padding: '8px 12px',
+    fontSize: '13px',
     fontWeight: '600' as const,
     color: 'var(--color-text-muted)',
     background: 'transparent',
