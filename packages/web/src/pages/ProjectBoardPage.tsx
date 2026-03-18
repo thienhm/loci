@@ -98,21 +98,23 @@ export function ProjectBoardPage() {
   })
 
   const { data: tickets = [], isLoading: ticketsLoading, error } = useQuery<Ticket[]>({
-    queryKey: ['tickets', projectId],
-    queryFn: () => fetchTickets(projectId!, { archived: 'all' }),
+    queryKey: ['tickets', projectId, showArchived ? 'all' : 'active'],
+    queryFn: () => fetchTickets(projectId!, showArchived ? { archived: 'all' } : undefined),
     enabled: !!projectId,
   })
+
+  const invalidateTickets = () => queryClient.invalidateQueries({ queryKey: ['tickets', projectId] })
 
   const updateMutation = useMutation({
     mutationFn: ({ ticketId, status }: { ticketId: string; status: TicketStatus }) =>
       updateTicket(projectId!, ticketId, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tickets', projectId] }),
+    onSuccess: invalidateTickets,
   })
 
   const createMutation = useMutation({
     mutationFn: (title: string) => createTicket(projectId!, { title }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets', projectId] })
+      invalidateTickets()
       queryClient.invalidateQueries({ queryKey: ['projects'] })
       setNewTicketTitle('')
       setShowNewTicket(false)
@@ -124,15 +126,10 @@ export function ProjectBoardPage() {
       await Promise.all(ticketIds.map(id => updateTicket(projectId!, id, { archived: true })))
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tickets', projectId] })
+      invalidateTickets()
       setSelectedTickets(new Set())
     },
   })
-
-  // Toggle hides/shows archived tickets.
-  const visibleTickets = useMemo(() => {
-    return showArchived ? tickets : tickets.filter(t => !t.archived)
-  }, [tickets, showArchived])
 
   function toggleSelect(ticketId: string) {
     setSelectedTickets(prev => {
@@ -335,7 +332,7 @@ export function ProjectBoardPage() {
         >
           <div style={styles.kanban}>
             {COLUMNS.map((col) => {
-              const colTickets = visibleTickets
+              const colTickets = tickets
                 .filter((t) => t.status === col.id)
                 .sort((a, b) => {
                   // Archived tickets go to bottom
@@ -367,7 +364,7 @@ export function ProjectBoardPage() {
         </DndContext>
       ) : (
         <TicketTable
-          tickets={visibleTickets}
+          tickets={tickets}
           projectId={projectId!}
           sortField={sortField}
           sortDir={sortDir}
