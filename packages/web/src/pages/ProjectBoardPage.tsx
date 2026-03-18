@@ -31,6 +31,8 @@ import {
 import { fetchProject, fetchTickets, updateTicket, createTicket } from '../api/client'
 import { useSSE } from '../hooks/useSSE'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { FilterBar, applyFilters, EMPTY_FILTERS } from '../components/FilterBar'
+import type { FilterState } from '../components/FilterBar'
 import type { Project, Ticket, TicketStatus, TicketPriority } from '../types'
 
 type ViewMode = 'kanban' | 'list'
@@ -63,6 +65,7 @@ export function ProjectBoardPage() {
   const [newTicketTitle, setNewTicketTitle] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS)
 
   const setViewMode = useCallback((mode: ViewMode) => {
     setViewModeState(mode)
@@ -96,6 +99,11 @@ export function ProjectBoardPage() {
     queryFn: () => fetchTickets(projectId!),
     enabled: !!projectId,
   })
+
+  const filteredTickets = useMemo(
+    () => applyFilters(tickets, filters),
+    [tickets, filters]
+  )
 
   const updateMutation = useMutation({
     mutationFn: ({ ticketId, status }: { ticketId: string; status: TicketStatus }) =>
@@ -276,6 +284,14 @@ export function ProjectBoardPage() {
         </div>
       )}
 
+      {/* Filter bar */}
+      <FilterBar
+        tickets={tickets}
+        filters={filters}
+        onChange={setFilters}
+        onClear={() => setFilters(EMPTY_FILTERS)}
+      />
+
       {/* Board */}
       {viewMode === 'kanban' ? (
         <DndContext
@@ -287,7 +303,7 @@ export function ProjectBoardPage() {
         >
           <div style={styles.kanban}>
             {COLUMNS.map((col) => {
-              const colTickets = tickets
+              const colTickets = filteredTickets
                 .filter((t) => t.status === col.id)
                 .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
               return (
@@ -310,7 +326,7 @@ export function ProjectBoardPage() {
         </DndContext>
       ) : (
         <TicketTable
-          tickets={tickets}
+          tickets={filteredTickets}
           projectId={projectId!}
           sortField={sortField}
           sortDir={sortDir}
