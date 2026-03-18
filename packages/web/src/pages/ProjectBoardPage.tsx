@@ -28,7 +28,7 @@ import {
   Bot,
   GripVertical,
   Archive,
-  ArchiveRestore,
+  CheckSquare,
   X,
 } from 'lucide-react'
 import { fetchProject, fetchTickets, updateTicket, createTicket } from '../api/client'
@@ -67,6 +67,7 @@ export function ProjectBoardPage() {
   const [sortField, setSortField] = useState<SortField>('updatedAt')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [showArchived, setShowArchived] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set())
 
   const setViewMode = useCallback((mode: ViewMode) => {
@@ -118,12 +119,6 @@ export function ProjectBoardPage() {
     },
   })
 
-  const archiveMutation = useMutation({
-    mutationFn: ({ ticketId, archived }: { ticketId: string; archived: boolean }) =>
-      updateTicket(projectId!, ticketId, { archived }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tickets', projectId] }),
-  })
-
   const bulkArchiveMutation = useMutation({
     mutationFn: async (ticketIds: string[]) => {
       await Promise.all(ticketIds.map(id => updateTicket(projectId!, id, { archived: true })))
@@ -134,10 +129,10 @@ export function ProjectBoardPage() {
     },
   })
 
-  // We fetch ALL tickets (archived=all) and filter client-side
+  // Show all tickets, archived sorted to bottom. Toggle hides/shows archived.
   const visibleTickets = useMemo(() => {
-    if (showArchived) return tickets
-    return tickets.filter(t => !t.archived)
+    const filtered = showArchived ? tickets : tickets.filter(t => !t.archived)
+    return [...filtered].sort((a, b) => Number(a.archived ?? false) - Number(b.archived ?? false))
   }, [tickets, showArchived])
 
   function toggleSelect(ticketId: string) {
@@ -268,6 +263,15 @@ export function ProjectBoardPage() {
             label="Archived"
           />
 
+          {/* Select mode toggle */}
+          <ToggleButton
+            id="toggle-select-btn"
+            active={selectMode}
+            onClick={() => { setSelectMode(v => !v); setSelectedTickets(new Set()) }}
+            icon={<CheckSquare size={14} />}
+            label="Select"
+          />
+
           {/* View toggle */}
           <div style={styles.viewToggle}>
             <ToggleButton
@@ -342,9 +346,9 @@ export function ProjectBoardPage() {
                   tickets={colTickets}
                   projectId={projectId!}
                   isHighlighted={overColumnId === col.id}
+                  selectMode={selectMode}
                   selectedTickets={selectedTickets}
                   onToggleSelect={toggleSelect}
-                  onArchive={(ticketId, archived) => archiveMutation.mutate({ ticketId, archived })}
                 />
               )
             })}
@@ -366,9 +370,9 @@ export function ProjectBoardPage() {
             if (field === sortField) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
             else { setSortField(field); setSortDir('asc') }
           }}
+          selectMode={selectMode}
           selectedTickets={selectedTickets}
           onToggleSelect={toggleSelect}
-          onArchive={(ticketId, archived) => archiveMutation.mutate({ ticketId, archived })}
         />
       )}
 
@@ -406,17 +410,17 @@ function KanbanColumn({
   tickets,
   projectId,
   isHighlighted,
+  selectMode,
   selectedTickets,
   onToggleSelect,
-  onArchive,
 }: {
   column: { id: TicketStatus; label: string }
   tickets: Ticket[]
   projectId: string
   isHighlighted: boolean
+  selectMode: boolean
   selectedTickets: Set<string>
   onToggleSelect: (ticketId: string) => void
-  onArchive: (ticketId: string, archived: boolean) => void
 }) {
   const { setNodeRef } = useDroppable({ id: column.id })
 
@@ -448,9 +452,9 @@ function KanbanColumn({
               key={ticket.id}
               ticket={ticket}
               projectId={projectId}
+              selectMode={selectMode}
               isSelected={selectedTickets.has(ticket.id)}
               onToggleSelect={onToggleSelect}
-              onArchive={onArchive}
             />
           ))}
 
@@ -472,15 +476,15 @@ function KanbanColumn({
 function SortableTicketCard({
   ticket,
   projectId,
+  selectMode,
   isSelected,
   onToggleSelect,
-  onArchive,
 }: {
   ticket: Ticket
   projectId: string
+  selectMode: boolean
   isSelected: boolean
   onToggleSelect: (ticketId: string) => void
-  onArchive: (ticketId: string, archived: boolean) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
@@ -498,9 +502,9 @@ function SortableTicketCard({
         ticket={ticket}
         projectId={projectId}
         dragHandleProps={listeners}
+        selectMode={selectMode}
         isSelected={isSelected}
         onToggleSelect={onToggleSelect}
-        onArchive={onArchive}
       />
     </div>
   )
@@ -515,17 +519,17 @@ function TicketCard({
   projectId,
   isDragging,
   dragHandleProps,
+  selectMode,
   isSelected,
   onToggleSelect,
-  onArchive,
 }: {
   ticket: Ticket
   projectId: string
   isDragging?: boolean
   dragHandleProps?: Record<string, unknown>
+  selectMode?: boolean
   isSelected?: boolean
   onToggleSelect?: (ticketId: string) => void
-  onArchive?: (ticketId: string, archived: boolean) => void
 }) {
   return (
     <div
@@ -541,10 +545,10 @@ function TicketCard({
         ...(isSelected ? { borderColor: 'var(--color-primary)', background: '#F0FDFA' } : {}),
       }}
     >
-      {/* Top row: checkbox + drag handle + ID (left), archive + priority + assignee (right) */}
+      {/* Top row: checkbox + drag handle + ID (left), priority + assignee (right) */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {onToggleSelect && (
+          {selectMode && onToggleSelect && (
             <input
               type="checkbox"
               checked={isSelected ?? false}
@@ -568,15 +572,6 @@ function TicketCard({
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {onArchive && (
-            <button
-              title={ticket.archived ? 'Unarchive' : 'Archive'}
-              onClick={(e) => { e.stopPropagation(); e.preventDefault(); onArchive(ticket.id, !ticket.archived) }}
-              style={styles.cardActionBtn}
-            >
-              {ticket.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
-            </button>
-          )}
           <PriorityBadge priority={ticket.priority} />
           {ticket.assignee && <AssigneeBadge assignee={ticket.assignee} />}
         </div>
@@ -619,18 +614,18 @@ function TicketTable({
   sortField,
   sortDir,
   onSort,
+  selectMode,
   selectedTickets,
   onToggleSelect,
-  onArchive,
 }: {
   tickets: Ticket[]
   projectId: string
   sortField: SortField
   sortDir: SortDir
   onSort: (field: SortField) => void
+  selectMode: boolean
   selectedTickets: Set<string>
   onToggleSelect: (ticketId: string) => void
-  onArchive: (ticketId: string, archived: boolean) => void
 }) {
   const sorted = [...tickets].sort((a, b) => {
     const mul = sortDir === 'asc' ? 1 : -1
@@ -649,7 +644,7 @@ function TicketTable({
       <table style={styles.table}>
         <thead>
           <tr>
-            <th style={{ ...styles.th, width: '36px', cursor: 'default' }}></th>
+            {selectMode && <th style={{ ...styles.th, width: '36px', cursor: 'default' }}></th>}
             {([
               ['id', 'ID'],
               ['title', 'Title'],
@@ -667,7 +662,6 @@ function TicketTable({
               </th>
             ))}
             <th style={styles.th}>Assignee</th>
-            <th style={{ ...styles.th, width: '50px', cursor: 'default' }}></th>
           </tr>
         </thead>
         <tbody>
@@ -683,14 +677,16 @@ function TicketTable({
               onMouseEnter={(e) => { if (!selectedTickets.has(ticket.id)) e.currentTarget.style.background = '#F8FFFE' }}
               onMouseLeave={(e) => { if (!selectedTickets.has(ticket.id)) e.currentTarget.style.background = '' }}
             >
-              <td style={styles.td}>
-                <input
-                  type="checkbox"
-                  checked={selectedTickets.has(ticket.id)}
-                  onChange={() => onToggleSelect(ticket.id)}
-                  style={{ accentColor: 'var(--color-primary)', cursor: 'pointer', margin: 0 }}
-                />
-              </td>
+              {selectMode && (
+                <td style={styles.td}>
+                  <input
+                    type="checkbox"
+                    checked={selectedTickets.has(ticket.id)}
+                    onChange={() => onToggleSelect(ticket.id)}
+                    style={{ accentColor: 'var(--color-primary)', cursor: 'pointer', margin: 0 }}
+                  />
+                </td>
+              )}
               <td style={styles.td}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Link
@@ -720,15 +716,6 @@ function TicketTable({
               </td>
               <td style={styles.td}>
                 {ticket.assignee ? <AssigneeBadge assignee={ticket.assignee} /> : null}
-              </td>
-              <td style={styles.td}>
-                <button
-                  title={ticket.archived ? 'Unarchive' : 'Archive'}
-                  onClick={() => onArchive(ticket.id, !ticket.archived)}
-                  style={styles.cardActionBtn}
-                >
-                  {ticket.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
-                </button>
               </td>
             </tr>
           ))}
@@ -1127,19 +1114,6 @@ const styles = {
     color: '#92400E',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
-  },
-  cardActionBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    border: 'none',
-    background: 'transparent',
-    cursor: 'pointer',
-    padding: '3px',
-    borderRadius: '4px',
-    color: 'var(--color-text-muted)',
-    transition: 'color 150ms ease',
-    lineHeight: 1,
   },
   floatingBar: {
     position: 'fixed' as const,
