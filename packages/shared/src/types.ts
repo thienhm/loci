@@ -32,6 +32,7 @@ export interface Ticket {
   labels: string[]
   assignee: Assignee
   progress: number      // 0–100, manual only, never auto-calculated
+  archived: boolean     // default false
   createdAt: string     // ISO 8601
   updatedAt: string     // ISO 8601
 }

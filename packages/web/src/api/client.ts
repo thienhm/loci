@@ -40,11 +40,12 @@ export async function fetchProject(projectId: string): Promise<Project> {
 // Tickets
 export async function fetchTickets(
   projectId: string,
-  filters?: { status?: string; assignee?: string }
+  filters?: { status?: string; assignee?: string; archived?: string }
 ): Promise<Ticket[]> {
   const params = new URLSearchParams()
   if (filters?.status) params.set('status', filters.status)
   if (filters?.assignee) params.set('assignee', filters.assignee)
+  if (filters?.archived) params.set('archived', filters.archived)
   const query = params.toString() ? `?${params}` : ''
   return get<Ticket[]>(`/projects/${projectId}/tickets${query}`)
 }

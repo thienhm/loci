@@ -50,10 +50,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // Tickets (nested under project)
   // -------------------------------------------------------------------------
 
-  // GET /api/projects/:projectId/tickets — all tickets, optional ?status= ?assignee=
+  // GET /api/projects/:projectId/tickets — all tickets, optional ?status= ?assignee= ?archived=
   app.get<{
     Params: { projectId: string }
-    Querystring: { status?: string; assignee?: string }
+    Querystring: { status?: string; assignee?: string; archived?: string }
   }>('/api/projects/:projectId/tickets', async (req, reply) => {
     const entry = findRegistryEntry(req.params.projectId)
     if (!entry) return reply.status(404).send({ error: 'Project not found' })
@@ -65,6 +65,13 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
     if (req.query.assignee) {
       tickets = tickets.filter((t) => t.assignee === req.query.assignee)
+    }
+    // Handle archived filter: default excludes archived, ?archived=true shows only archived, ?archived=all shows all
+    if (req.query.archived === 'true') {
+      tickets = tickets.filter((t) => t.archived === true)
+    } else if (req.query.archived !== 'all') {
+      // Default: exclude archived
+      tickets = tickets.filter((t) => t.archived !== true)
     }
 
     return reply.send(tickets)
@@ -100,6 +107,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       labels: req.body.labels ?? [],
       assignee: (req.body.assignee as Ticket['assignee']) ?? null,
       progress: 0,
+      archived: false,
       createdAt: now,
       updatedAt: now,
     }
