@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { z } from 'zod'
 import type { Ticket } from '@loci/shared'
@@ -13,6 +13,10 @@ import {
   createTicket,
   readTicketDoc,
   writeTicketDoc,
+  readAttachments,
+  writeAttachments,
+  listFiles,
+  getFilesDir,
 } from './data'
 
 // ---------------------------------------------------------------------------
@@ -299,6 +303,99 @@ export function createMcpServer(): McpServer {
 
       writeTicketDoc(entry.path, id, filename, content)
       return { content: [{ type: 'text' as const, text: `Written ${filename} to ticket ${id}` }] }
+    }
+  )
+
+  // -------------------------------------------------------------------------
+  // Attachments
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    'list_attachments',
+    {
+      description: 'List file attachments for a ticket',
+      inputSchema: z.object({
+        id: z.string().describe('Ticket ID, e.g. LCI-001'),
+      }),
+    },
+    async ({ id }) => {
+      const entry = findProjectByTicketId(id)
+      if (!entry) return errorResult(`Project not found for ticket ${id}`)
+
+      const ticket = readTicketWithDocs(entry.path, id)
+      if (!ticket) return errorResult(`Ticket ${id} not found`)
+
+      return jsonResult(readAttachments(entry.path, id))
+    }
+  )
+
+  server.registerTool(
+    'update_attachments',
+    {
+      description: 'Update the list of file attachments for a ticket',
+      inputSchema: z.object({
+        id: z.string().describe('Ticket ID, e.g. LCI-001'),
+        attachments: z.array(z.string()).describe('List of attachment filenames'),
+      }),
+    },
+    async ({ id, attachments }) => {
+      const entry = findProjectByTicketId(id)
+      if (!entry) return errorResult(`Project not found for ticket ${id}`)
+
+      const ticket = readTicketWithDocs(entry.path, id)
+      if (!ticket) return errorResult(`Ticket ${id} not found`)
+
+      writeAttachments(entry.path, id, attachments)
+      return { content: [{ type: 'text' as const, text: `Updated attachments for ticket ${id}` }] }
+    }
+  )
+
+  // -------------------------------------------------------------------------
+  // Files
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    'list_files',
+    {
+      description: 'List uploaded files for a ticket',
+      inputSchema: z.object({
+        id: z.string().describe('Ticket ID, e.g. LCI-001'),
+      }),
+    },
+    async ({ id }) => {
+      const entry = findProjectByTicketId(id)
+      if (!entry) return errorResult(`Project not found for ticket ${id}`)
+
+      const ticket = readTicketWithDocs(entry.path, id)
+      if (!ticket) return errorResult(`Ticket ${id} not found`)
+
+      return jsonResult(listFiles(entry.path, id))
+    }
+  )
+
+  server.registerTool(
+    'delete_file',
+    {
+      description: 'Delete an uploaded file from a ticket',
+      inputSchema: z.object({
+        id: z.string().describe('Ticket ID, e.g. LCI-001'),
+        filename: z.string().describe('Name of the file to delete'),
+      }),
+    },
+    async ({ id, filename }) => {
+      const entry = findProjectByTicketId(id)
+      if (!entry) return errorResult(`Project not found for ticket ${id}`)
+
+      const ticket = readTicketWithDocs(entry.path, id)
+      if (!ticket) return errorResult(`Ticket ${id} not found`)
+
+      const filePath = join(getFilesDir(entry.path, id), filename)
+      if (!existsSync(filePath)) {
+        return errorResult(`File ${filename} not found on ticket ${id}`)
+      }
+
+      unlinkSync(filePath)
+      return { content: [{ type: 'text' as const, text: `Deleted ${filename} from ticket ${id}` }] }
     }
   )
 
