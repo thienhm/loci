@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -22,6 +22,7 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     labels: [],
     assignee: null,
     progress: 0,
+    archived: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -303,6 +304,162 @@ describe('write_ticket_doc', () => {
       filename: 'script.js',
       content: 'bad',
     })
+    expect(raw.isError).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// list_tickets — archived filter
+// ---------------------------------------------------------------------------
+
+describe('list_tickets — archived filter', () => {
+  it('excludes archived tickets by default', async () => {
+    seedTicket('MCP-001', { archived: false })
+    seedTicket('MCP-002', { archived: true })
+    const { client } = await buildClient()
+    const result = parseResult(await callTool(client, 'list_tickets'))
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('MCP-001')
+  })
+
+  it('returns only archived tickets when archived=true', async () => {
+    seedTicket('MCP-001', { archived: false })
+    seedTicket('MCP-002', { archived: true })
+    const { client } = await buildClient()
+    const result = parseResult(await callTool(client, 'list_tickets', { archived: true }))
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('MCP-002')
+  })
+
+  it('returns only non-archived tickets when archived=false', async () => {
+    seedTicket('MCP-001', { archived: false })
+    seedTicket('MCP-002', { archived: true })
+    const { client } = await buildClient()
+    const result = parseResult(await callTool(client, 'list_tickets', { archived: false }))
+    expect(result).toHaveLength(1)
+    expect(result[0].id).toBe('MCP-001')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// list_attachments
+// ---------------------------------------------------------------------------
+
+describe('list_attachments', () => {
+  it('returns empty array for new ticket', async () => {
+    seedTicket('MCP-001')
+    const { client } = await buildClient()
+    const result = parseResult(await callTool(client, 'list_attachments', { id: 'MCP-001' }))
+    expect(result).toEqual([])
+  })
+
+  it('returns seeded attachments', async () => {
+    seedTicket('MCP-001')
+    // Seed attachments
+    const dir = join(tmpWorkspace, '.loci', 'tickets', 'MCP-001')
+    writeFileSync(join(dir, 'attachments.json'), JSON.stringify(['file1.png', 'file2.pdf'], null, 2))
+    const { client } = await buildClient()
+    const result = parseResult(await callTool(client, 'list_attachments', { id: 'MCP-001' }))
+    expect(result).toEqual(['file1.png', 'file2.pdf'])
+  })
+
+  it('returns error for unknown ticket', async () => {
+    const { client } = await buildClient()
+    const raw = await callTool(client, 'list_attachments', { id: 'MCP-999' })
+    expect(raw.isError).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// update_attachments
+// ---------------------------------------------------------------------------
+
+describe('update_attachments', () => {
+  it('writes attachments and can be read back', async () => {
+    seedTicket('MCP-001')
+    const { client } = await buildClient()
+
+    await callTool(client, 'update_attachments', {
+      id: 'MCP-001',
+      attachments: ['report.pdf', 'screenshot.png'],
+    })
+
+    const result = parseResult(await callTool(client, 'list_attachments', { id: 'MCP-001' }))
+    expect(result).toEqual(['report.pdf', 'screenshot.png'])
+  })
+
+  it('returns error for unknown ticket', async () => {
+    const { client } = await buildClient()
+    const raw = await callTool(client, 'update_attachments', {
+      id: 'MCP-999',
+      attachments: ['file.png'],
+    })
+    expect(raw.isError).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// list_files
+// ---------------------------------------------------------------------------
+
+describe('list_files', () => {
+  it('returns empty array when no files uploaded', async () => {
+    seedTicket('MCP-001')
+    const { client } = await buildClient()
+    const result = parseResult(await callTool(client, 'list_files', { id: 'MCP-001' }))
+    expect(result).toEqual([])
+  })
+
+  it('returns file info for uploaded files', async () => {
+    seedTicket('MCP-001')
+    // Seed a file
+    const filesDir = join(tmpWorkspace, '.loci', 'tickets', 'MCP-001', 'files')
+    mkdirSync(filesDir, { recursive: true })
+    writeFileSync(join(filesDir, 'test.png'), Buffer.from('fake-png-data'))
+    const { client } = await buildClient()
+    const result = parseResult(await callTool(client, 'list_files', { id: 'MCP-001' }))
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe('test.png')
+    expect(result[0].mimeType).toBe('image/png')
+    expect(result[0].size).toBeGreaterThan(0)
+  })
+
+  it('returns error for unknown ticket', async () => {
+    const { client } = await buildClient()
+    const raw = await callTool(client, 'list_files', { id: 'MCP-999' })
+    expect(raw.isError).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// delete_file
+// ---------------------------------------------------------------------------
+
+describe('delete_file', () => {
+  it('deletes an existing file', async () => {
+    seedTicket('MCP-001')
+    const filesDir = join(tmpWorkspace, '.loci', 'tickets', 'MCP-001', 'files')
+    mkdirSync(filesDir, { recursive: true })
+    writeFileSync(join(filesDir, 'to-delete.txt'), 'content')
+
+    const { client } = await buildClient()
+    const raw = await callTool(client, 'delete_file', { id: 'MCP-001', filename: 'to-delete.txt' })
+    expect(raw.isError).toBeFalsy()
+
+    // Verify file is gone
+    expect(existsSync(join(filesDir, 'to-delete.txt'))).toBe(false)
+  })
+
+  it('returns error for non-existent file', async () => {
+    seedTicket('MCP-001')
+    const { client } = await buildClient()
+    const raw = await callTool(client, 'delete_file', { id: 'MCP-001', filename: 'missing.txt' })
+    expect(raw.isError).toBe(true)
+  })
+
+  it('returns error for unknown ticket', async () => {
+    const { client } = await buildClient()
+    const raw = await callTool(client, 'delete_file', { id: 'MCP-999', filename: 'file.txt' })
     expect(raw.isError).toBe(true)
   })
 })
