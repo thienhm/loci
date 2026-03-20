@@ -31,13 +31,22 @@ export const listCommand = new Command('list')
       return
     }
 
-    const tickets: Ticket[] = readdirSync(ticketsDir)
-      .map((id) => {
-        const ticketPath = join(ticketsDir, id, 'ticket.json')
-        if (!existsSync(ticketPath)) return null
-        return JSON.parse(readFileSync(ticketPath, 'utf8')) as Ticket
-      })
-      .filter(Boolean) as Ticket[]
+    const scanDir = (dir: string): Ticket[] => {
+      if (!existsSync(dir)) return []
+      return readdirSync(dir)
+        .filter((id) => id !== 'archived')
+        .map((id) => {
+          const ticketPath = join(dir, id, 'ticket.json')
+          if (!existsSync(ticketPath)) return null
+          return JSON.parse(readFileSync(ticketPath, 'utf8')) as Ticket
+        })
+        .filter(Boolean) as Ticket[]
+    }
+
+    const tickets: Ticket[] = [
+      ...scanDir(ticketsDir),
+      ...scanDir(join(ticketsDir, 'archived')),
+    ]
 
     if (tickets.length === 0) {
       console.log('No tickets yet. Run `loci add "title"` to create one.')
