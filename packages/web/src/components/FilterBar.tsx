@@ -100,11 +100,11 @@ export function FilterBar({
     <div style={styles.bar}>
       {/* Search */}
       <div style={styles.searchWrapper}>
-        <Search size={16} color="var(--color-text-muted)" />
+        <Search size={14} color="var(--color-on-surface-variant)" />
         <input
           id="filter-search"
           type="text"
-          placeholder="Search title, ID, labels…"
+          placeholder="Search tasks…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           style={styles.searchInput}
@@ -115,6 +115,14 @@ export function FilterBar({
           </button>
         )}
       </div>
+
+      {/* Clear all filters — next to search */}
+      {isFiltering(filters) && (
+        <button onClick={onClear} style={styles.clearBtn}>
+          <X size={12} />
+          Clear
+        </button>
+      )}
 
       {/* Status multi-select */}
       <MultiSelect
@@ -145,14 +153,6 @@ export function FilterBar({
             onChange={(v) => onChange({ ...filters, assignee: v || null })}
           />
         </div>
-      )}
-
-      {/* Clear */}
-      {isFiltering(filters) && (
-        <button onClick={onClear} style={styles.clearBtn}>
-          <X size={12} />
-          Clear
-        </button>
       )}
     </div>
   )
@@ -213,7 +213,7 @@ function MultiSelect({
               onClick={() => toggle(opt.value)}
               style={{
                 ...styles.dropdownItem,
-                ...(selected.includes(opt.value) ? { background: '#F0FDFA', color: 'var(--color-primary)', fontWeight: '600' } : {}),
+                ...(selected.includes(opt.value) ? { background: 'rgba(0, 104, 95, 0.06)', color: 'var(--color-primary)', fontWeight: '600' } : {}),
               }}
             >
               {opt.label}
@@ -274,7 +274,7 @@ function DropdownSelect({
               onClick={() => { onChange(opt.value); setOpen(false) }}
               style={{
                 ...styles.dropdownItem,
-                ...(value === opt.value ? { background: '#F0FDFA', color: 'var(--color-primary)', fontWeight: '600' } : {}),
+                ...(value === opt.value ? { background: 'rgba(0, 104, 95, 0.06)', color: 'var(--color-primary)', fontWeight: '600' } : {}),
               }}
             >
               {opt.label}
@@ -293,26 +293,26 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    flexWrap: 'wrap' as const,
+    flexWrap: 'nowrap' as const,
     flexShrink: 0,
   },
   searchWrapper: {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    padding: '8px 12px',
-    border: '1px solid var(--color-border)',
-    borderRadius: '6px',
-    background: 'var(--color-surface)',
-    flex: '1 1 200px',
-    maxWidth: '360px',
+    padding: '6px 12px',
+    border: 'none',
+    borderRadius: '8px',
+    background: '#ffffff',
+    flex: '1 1 auto',
+    minWidth: '400px',
   },
   searchInput: {
     flex: 1,
     border: 'none',
     outline: 'none',
     fontSize: '13px',
-    color: 'var(--color-text)',
+    color: 'var(--color-on-surface)',
     background: 'transparent',
     fontFamily: 'inherit',
   },
@@ -322,23 +322,24 @@ const styles = {
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
-    color: 'var(--color-text-muted)',
+    color: 'var(--color-on-surface-variant)',
     padding: '2px',
   },
   dropdownBtn: {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '8px 12px',
+    padding: '6px 12px',
     fontSize: '13px',
     fontWeight: '500' as const,
-    color: 'var(--color-text-muted)',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: '6px',
+    color: 'var(--color-on-surface-variant)',
+    background: 'var(--color-surface-container-lowest)',
+    border: '1px solid rgba(188, 201, 198, 0.3)',
+    borderRadius: '8px',
     cursor: 'pointer',
     fontFamily: 'inherit',
     whiteSpace: 'nowrap' as const,
+    transition: 'all var(--transition-fast)',
   },
   filterCount: {
     fontSize: '10px',
@@ -355,10 +356,12 @@ const styles = {
     left: 0,
     marginTop: '4px',
     minWidth: '140px',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: '8px',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+    background: 'rgba(247, 249, 251, 0.85)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid rgba(188, 201, 198, 0.15)',
+    borderRadius: '10px',
+    boxShadow: '0 4px 20px rgba(25, 28, 30, 0.06)',
     zIndex: 100,
     overflow: 'hidden',
   },
@@ -368,7 +371,7 @@ const styles = {
     padding: '8px 14px',
     fontSize: '13px',
     fontWeight: '400' as const,
-    color: 'var(--color-text)',
+    color: 'var(--color-on-surface)',
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
@@ -380,13 +383,13 @@ const styles = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '8px 12px',
+    padding: '6px 12px',
     fontSize: '13px',
     fontWeight: '600' as const,
-    color: 'var(--color-text-muted)',
+    color: 'var(--color-on-surface-variant)',
     background: 'transparent',
-    border: '1px solid var(--color-border)',
-    borderRadius: '6px',
+    border: '1px solid rgba(188, 201, 198, 0.3)',
+    borderRadius: '8px',
     cursor: 'pointer',
     fontFamily: 'inherit',
   },

@@ -16,7 +16,7 @@ export function DashboardPage() {
     return (
       <div style={styles.center}>
         <Loader2 size={24} style={{ color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }} />
-        <span style={{ color: 'var(--color-text-muted)', marginTop: '12px' }}>Loading projects…</span>
+        <span style={{ color: 'var(--color-on-surface-variant)', marginTop: '12px', fontSize: '13px' }}>Loading projects…</span>
       </div>
     )
   }
@@ -24,8 +24,8 @@ export function DashboardPage() {
   if (error) {
     return (
       <div style={styles.center}>
-        <AlertCircle size={24} style={{ color: 'var(--color-priority-high)' }} />
-        <span style={{ color: 'var(--color-priority-high)', marginTop: '12px' }}>
+        <AlertCircle size={24} style={{ color: 'var(--color-error)' }} />
+        <span style={{ color: 'var(--color-error)', marginTop: '12px', fontSize: '13px' }}>
           Could not reach server — is <code>loci serve</code> running?
         </span>
       </div>
@@ -37,13 +37,23 @@ export function DashboardPage() {
       {/* Page header */}
       <div style={styles.header}>
         <div>
-          <h1 id="dashboard-heading" style={styles.heading}>All Projects</h1>
+          <h1 id="dashboard-heading" style={styles.heading}>Active Projects</h1>
           <p style={styles.subheading}>
             {projects.length === 0
               ? 'No projects yet'
               : `${projects.length} project${projects.length === 1 ? '' : 's'}`}
           </p>
         </div>
+        <button
+          id="new-project-cta"
+          onClick={() => navigate('/')}
+          style={styles.newProjectBtn}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+        >
+          <Plus size={16} />
+          New Project
+        </button>
       </div>
 
       {/* Project grid */}
@@ -86,118 +96,91 @@ function ProjectCard({ project, onOpen }: { project: Project; onOpen: () => void
   )
 
   const total = tickets.length
+  const donePercent = total > 0 ? Math.round((counts.done / total) * 100) : 0
 
   return (
     <div
       id={`project-card-${project.id}`}
       style={styles.card}
+      onClick={onOpen}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = '0 8px 24px rgba(13, 148, 136, 0.12)'
-        e.currentTarget.style.transform = 'translateY(-2px)'
-        e.currentTarget.style.borderColor = 'var(--color-primary)'
+        e.currentTarget.style.boxShadow = '0 4px 20px rgba(25, 28, 30, 0.06)'
+        e.currentTarget.style.borderColor = 'rgba(188, 201, 198, 0.2)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)'
-        e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.borderColor = 'var(--color-border)'
+        e.currentTarget.style.boxShadow = 'none'
+        e.currentTarget.style.borderColor = 'transparent'
       }}
     >
-      {/* Card header */}
-      <div style={styles.cardHeader}>
-        <div style={styles.cardIcon}>
-          <FolderKanban size={18} color="#fff" />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={styles.projectName}>{project.name}</div>
-          <div style={styles.prefixBadge}>{project.prefix}</div>
-        </div>
+      {/* Card icon */}
+      <div style={styles.cardIconContainer}>
+        <FolderKanban size={20} color="var(--color-primary)" />
       </div>
 
-      {/* Ticket counts */}
-      <div style={styles.countsRow}>
-        <CountPill
-          label="Todo"
-          count={counts.todo}
-          color="var(--color-status-todo)"
-          dotColor="#94A3B8"
-        />
-        <CountPill
-          label="In Progress"
-          count={counts.in_progress}
-          color="var(--color-status-in-progress)"
-          dotColor="#3B82F6"
-        />
-        <CountPill
-          label="Done"
-          count={counts.done}
-          color="var(--color-status-done)"
-          dotColor="#22C55E"
-        />
+      {/* Project name & description */}
+      <h3 style={styles.projectName}>{project.name}</h3>
+      <p style={styles.projectDesc}>
+        {project.prefix} · {total} ticket{total !== 1 ? 's' : ''}
+      </p>
+
+      {/* Status capsules */}
+      <div style={styles.capsuleRow}>
+        <StatusCapsule label="Todo" count={counts.todo} variant="todo" />
+        <StatusCapsule label="In Progress" count={counts.in_progress} variant="in_progress" />
+        <StatusCapsule label="Done" count={counts.done} variant="done" />
       </div>
 
       {/* Progress bar */}
-      {total > 0 && (
-        <div style={styles.progressBarBg}>
+      <div style={styles.progressSection}>
+        <div style={styles.progressMeta}>
+          <span>Progress</span>
+          <span>{donePercent}%</span>
+        </div>
+        <div style={styles.progressTrack}>
           <div
             style={{
-              ...styles.progressBarFill,
-              width: `${Math.round((counts.done / total) * 100)}%`,
+              ...styles.progressFill,
+              width: `${donePercent}%`,
             }}
           />
         </div>
-      )}
-
-      {/* Footer */}
-      <div style={styles.cardFooter}>
-        <span style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
-          {total} ticket{total !== 1 ? 's' : ''}
-        </span>
-        <button
-          id={`open-board-${project.id}`}
-          onClick={onOpen}
-          style={styles.openButton}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--color-primary)'
-            e.currentTarget.style.color = '#fff'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = 'var(--color-primary)'
-          }}
-        >
-          Open Board →
-        </button>
       </div>
     </div>
   )
 }
 
-function CountPill({
+function StatusCapsule({
   label,
   count,
-  dotColor,
+  variant,
 }: {
   label: string
   count: number
-  color: string
-  dotColor: string
+  variant: 'todo' | 'in_progress' | 'done'
 }) {
+  const capsuleStyles: Record<string, { bg: string; color: string }> = {
+    todo: { bg: 'var(--color-secondary-container)', color: 'var(--color-on-secondary-container)' },
+    in_progress: { bg: 'rgba(107, 216, 203, 0.2)', color: 'var(--color-primary)' },
+    done: { bg: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface-variant)' },
+  }
+
+  const s = capsuleStyles[variant]
+
   return (
-    <div style={styles.pill}>
-      <div
-        style={{
-          width: '7px',
-          height: '7px',
-          borderRadius: '50%',
-          background: dotColor,
-          flexShrink: 0,
-        }}
-      />
-      <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>{label}</span>
-      <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--color-text)', marginLeft: 'auto' }}>
-        {count}
-      </span>
-    </div>
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '4px 10px',
+        borderRadius: '9999px',
+        fontSize: '10px',
+        fontWeight: '700',
+        background: s.bg,
+        color: s.color,
+      }}
+    >
+      {label}: {count}
+    </span>
   )
 }
 
@@ -209,13 +192,13 @@ function EmptyState() {
   return (
     <div style={styles.emptyState}>
       <div style={styles.emptyIcon}>
-        <Plus size={28} color="var(--color-text-muted)" />
+        <Plus size={28} color="var(--color-on-surface-variant)" />
       </div>
-      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--color-text)', margin: '0 0 8px' }}>
+      <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-on-surface)', margin: '0 0 8px' }}>
         No projects yet
       </h2>
-      <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', margin: 0, textAlign: 'center', maxWidth: '320px' }}>
-        Run <code style={{ background: '#E2E8F0', padding: '2px 6px', borderRadius: '4px', fontSize: '13px' }}>loci init</code> in a workspace folder to create your first project.
+      <p style={{ color: 'var(--color-on-surface-variant)', fontSize: '13px', margin: 0, textAlign: 'center', maxWidth: '320px' }}>
+        Run <code style={{ background: 'var(--color-surface-container-high)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>loci init</code> in a workspace folder to create your first project.
       </p>
     </div>
   )
@@ -228,112 +211,114 @@ function EmptyState() {
 const styles = {
   page: {
     padding: '32px 36px',
-    maxWidth: '1100px',
+    maxWidth: '1200px',
+    background: 'var(--color-surface-container-low)',
+    minHeight: '100%',
   },
   header: {
     display: 'flex',
-    alignItems: 'flex-start',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
-    marginBottom: '28px',
+    marginBottom: '32px',
+    gap: '16px',
   },
   heading: {
-    fontSize: '22px',
-    fontWeight: '700',
-    color: 'var(--color-text)',
+    fontSize: '1.5rem',
+    fontWeight: '800',
+    color: 'var(--color-on-surface)',
     margin: 0,
+    letterSpacing: '-0.02em',
   },
   subheading: {
-    fontSize: '13px',
-    color: 'var(--color-text-muted)',
+    fontSize: '12px',
+    color: 'var(--color-on-surface-variant)',
     margin: '4px 0 0',
+    fontWeight: '500',
+  },
+  newProjectBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 20px',
+    borderRadius: '8px',
+    border: 'none',
+    background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-container))',
+    color: 'var(--color-on-primary)',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'opacity var(--transition-fast)',
+    fontFamily: 'inherit',
+    boxShadow: '0 1px 4px rgba(0, 104, 95, 0.15)',
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: '16px',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+    gap: '24px',
   },
   card: {
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
+    background: 'var(--color-surface-container-lowest)',
+    border: '1px solid transparent',
     borderRadius: '12px',
-    padding: '20px',
+    padding: '24px',
     cursor: 'pointer',
-    transition: 'all 150ms ease',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+    transition: 'all 300ms ease',
+    boxShadow: 'none',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '16px',
+    gap: '4px',
   },
-  cardHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  cardIcon: {
-    width: '36px',
-    height: '36px',
+  cardIconContainer: {
+    width: '40px',
+    height: '40px',
     borderRadius: '8px',
-    background: 'var(--color-primary)',
+    background: 'rgba(0, 104, 95, 0.08)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
+    marginBottom: '12px',
   },
   projectName: {
-    fontSize: '15px',
+    fontSize: '16px',
     fontWeight: '600',
-    color: 'var(--color-text)',
+    color: 'var(--color-on-surface)',
     lineHeight: 1.3,
+    margin: '0 0 4px',
   },
-  prefixBadge: {
-    display: 'inline-block',
-    fontSize: '10px',
-    fontWeight: '700',
-    letterSpacing: '0.05em',
-    padding: '1px 6px',
-    borderRadius: '4px',
-    background: '#CCFBF1',
-    color: 'var(--color-primary)',
-    marginTop: '3px',
+  projectDesc: {
+    fontSize: '13px',
+    color: 'var(--color-on-surface-variant)',
+    margin: '0 0 20px',
+    lineHeight: 1.5,
   },
-  countsRow: {
+  capsuleRow: {
     display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '6px',
+    flexWrap: 'wrap' as const,
+    gap: '8px',
+    marginBottom: '20px',
   },
-  pill: {
+  progressSection: {
+    marginTop: 'auto',
+  },
+  progressMeta: {
     display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
+    justifyContent: 'space-between',
+    fontSize: '11px',
+    fontWeight: '500',
+    color: 'var(--color-on-surface-variant)',
+    marginBottom: '6px',
   },
-  progressBarBg: {
-    height: '4px',
-    background: 'var(--color-border)',
-    borderRadius: '2px',
+  progressTrack: {
+    height: '6px',
+    background: 'var(--color-surface-container-high)',
+    borderRadius: '9999px',
     overflow: 'hidden',
   },
-  progressBarFill: {
+  progressFill: {
     height: '100%',
-    background: 'var(--color-status-done)',
-    borderRadius: '2px',
-    transition: 'width 300ms ease',
-  },
-  cardFooter: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  openButton: {
-    background: 'transparent',
-    border: '1px solid var(--color-primary)',
-    color: 'var(--color-primary)',
-    padding: '5px 12px',
-    borderRadius: '6px',
-    fontSize: '12px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'all 150ms ease',
-    fontFamily: 'inherit',
+    background: 'var(--color-primary)',
+    borderRadius: '9999px',
+    transition: 'width 1000ms ease',
   },
   center: {
     display: 'flex',
@@ -353,8 +338,8 @@ const styles = {
   emptyIcon: {
     width: '60px',
     height: '60px',
-    borderRadius: '16px',
-    background: 'var(--color-border)',
+    borderRadius: '50%',
+    background: 'var(--color-surface-container-high)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

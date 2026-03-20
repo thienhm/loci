@@ -1,34 +1,73 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
 @theme {
-  /* Loci design tokens */
-  --color-primary: #0d9488;
-  --color-primary-hover: #0f766e;
-  --color-secondary: #14b8a6;
-  --color-accent: #f97316;
-  --color-accent-hover: #ea6c08;
-  --color-background: #f0fdfa;
-  --color-surface: #ffffff;
-  --color-text: #134e4a;
-  --color-text-muted: #5eaba1;
-  --color-border: #e2e8f0;
+  /* ─── Core palette ─────────────────────────────────────────────────────────── */
+  --color-primary: #00685f;
+  --color-primary-hover: #005049;
+  --color-primary-container: #008378;
+  --color-on-primary: #ffffff;
 
-  /* Status colors */
+  /* ─── Surface hierarchy (No-Line Rule) ─────────────────────────────────────── */
+  --color-surface: #f7f9fb;
+  --color-surface-container-low: #f2f4f6;
+  --color-surface-container: #eceef0;
+  --color-surface-container-high: #e6e8ea;
+  --color-surface-container-highest: #e0e3e5;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-bright: #f7f9fb;
+  --color-surface-dim: #d8dadc;
+
+  /* ─── Text & on-surface ────────────────────────────────────────────────────── */
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #3d4947;
+  --color-text: #191c1e;
+  --color-text-muted: #3d4947;
+
+  /* ─── Secondary ────────────────────────────────────────────────────────────── */
+  --color-secondary: #515f74;
+  --color-secondary-container: #d5e3fc;
+  --color-on-secondary-container: #57657a;
+
+  /* ─── Tertiary (warnings, high priority) ───────────────────────────────────── */
+  --color-tertiary: #924628;
+  --color-tertiary-container: #b05e3d;
+
+  /* ─── Outline & borders ────────────────────────────────────────────────────── */
+  --color-outline: #6d7a77;
+  --color-outline-variant: #bcc9c6;
+  --color-border: #bcc9c6;
+
+  /* ─── Error ────────────────────────────────────────────────────────────────── */
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+
+  /* ─── Accent tokens (mapped from old palette) ─────────────────────────────── */
+  --color-accent: #00685f;
+  --color-accent-hover: #005049;
+
+  /* ─── Functional tokens for primary fixed ──────────────────────────────────── */
+  --color-primary-fixed-dim: #6bd8cb;
+
+  /* ─── Status colors ────────────────────────────────────────────────────────── */
   --color-status-todo: #94a3b8;
   --color-status-in-progress: #3b82f6;
+  --color-status-in-review: #f59e0b;
   --color-status-done: #22c55e;
 
-  /* Priority colors */
-  --color-priority-high: #ef4444;
+  /* ─── Priority colors ──────────────────────────────────────────────────────── */
+  --color-priority-high: #924628;
   --color-priority-medium: #f59e0b;
   --color-priority-low: #94a3b8;
 
-  /* Typography */
+  /* ─── Background (page-level) ──────────────────────────────────────────────── */
+  --color-background: #f2f4f6;
+
+  /* ─── Typography ───────────────────────────────────────────────────────────── */
   --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
 
-  /* Transitions */
+  /* ─── Transitions ──────────────────────────────────────────────────────────── */
   --transition-fast: 150ms ease;
   --transition-base: 200ms ease;
 }
@@ -49,49 +88,49 @@ body,
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--color-background);
-  color: var(--color-text);
+  background-color: var(--color-surface-container-low);
+  color: var(--color-on-surface);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
+/* ─── Scrollbar ("Architect" feel) ─────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--color-surface-container-low);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
+  background: var(--color-outline-variant);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
+  background: var(--color-outline);
 }
 
-/* ─── Markdown prose overrides (Loci teal palette) ─────────────────────────── */
+/* ─── Markdown prose overrides ─────────────────────────────────────────────── */
 .loci-markdown {
-  --tw-prose-body: #134e4a;
-  --tw-prose-headings: #0f4c45;
-  --tw-prose-lead: #5eaba1;
-  --tw-prose-links: #0d9488;
-  --tw-prose-bold: #134e4a;
-  --tw-prose-counters: #5eaba1;
-  --tw-prose-bullets: #0d9488;
-  --tw-prose-hr: #e2e8f0;
-  --tw-prose-quotes: #134e4a;
-  --tw-prose-quote-borders: #0d9488;
-  --tw-prose-captions: #5eaba1;
-  --tw-prose-code: #0f766e;
-  --tw-prose-pre-code: #e2e8f0;
-  --tw-prose-pre-bg: #134e4a;
-  --tw-prose-th-borders: #e2e8f0;
-  --tw-prose-td-borders: #e2e8f0;
+  --tw-prose-body: #191c1e;
+  --tw-prose-headings: #191c1e;
+  --tw-prose-lead: #3d4947;
+  --tw-prose-links: #00685f;
+  --tw-prose-bold: #191c1e;
+  --tw-prose-counters: #3d4947;
+  --tw-prose-bullets: #00685f;
+  --tw-prose-hr: #e6e8ea;
+  --tw-prose-quotes: #191c1e;
+  --tw-prose-quote-borders: #00685f;
+  --tw-prose-captions: #3d4947;
+  --tw-prose-code: #005049;
+  --tw-prose-pre-code: #e0e3e5;
+  --tw-prose-pre-bg: #191c1e;
+  --tw-prose-th-borders: #e6e8ea;
+  --tw-prose-td-borders: #e6e8ea;
 
   font-family: var(--font-sans);
   max-width: none;
@@ -111,10 +150,10 @@ body {
 .loci-markdown h3,
 .loci-markdown h4 {
   font-family: var(--font-sans);
+  letter-spacing: -0.02em;
 }
 
-/* ─── Syntax highlighting theme (dark teal bg, WCAG AA accessible) ─────────── */
-/* All token colors verified ≥4.5:1 contrast against bg #134e4a (luminance 0.047) */
+/* ─── Syntax highlighting theme ────────────────────────────────────────────── */
 .loci-markdown pre code.hljs {
   display: block;
   overflow-x: auto;
@@ -122,20 +161,17 @@ body {
   font-size: 0.875rem;
 }
 
-/* Base text: #e2e8f0 — contrast 9.9:1 ✓ */
 .hljs {
-  color: #e2e8f0;
-  background: #134e4a;
+  color: #e0e3e5;
+  background: #191c1e;
 }
 
-/* Comments: #94a3b8 — contrast 4.5:1 ✓ */
 .loci-markdown .hljs-comment,
 .loci-markdown .hljs-punctuation {
   color: #94a3b8;
   font-style: italic;
 }
 
-/* Attributes/selectors: #7dd3fc (sky-300) — contrast 5.6:1 ✓ */
 .loci-markdown .hljs-attr,
 .loci-markdown .hljs-attribute,
 .loci-markdown .hljs-meta,
@@ -145,14 +181,12 @@ body {
   color: #7dd3fc;
 }
 
-/* Variables/literals: #fcd34d (amber-300) — contrast 6.6:1 ✓ */
 .loci-markdown .hljs-variable,
 .loci-markdown .hljs-literal,
 .loci-markdown .hljs-number {
   color: #fcd34d;
 }
 
-/* Keywords/types: #fca5a5 (red-300) — contrast 4.8:1 ✓ */
 .loci-markdown .hljs-doctag,
 .loci-markdown .hljs-keyword,
 .loci-markdown .hljs-template-tag,
@@ -162,14 +196,12 @@ body {
   color: #fca5a5;
 }
 
-/* Function/class titles: #93c5fd (blue-300) — contrast 5.1:1 ✓ */
 .loci-markdown .hljs-title,
 .loci-markdown .hljs-title.class_.inherited__,
 .loci-markdown .hljs-title.function_ {
   color: #93c5fd;
 }
 
-/* Strings/built-ins: #86efac (green-300) — contrast 6.0:1 ✓ */
 .loci-markdown .hljs-addition,
 .loci-markdown .hljs-built_in,
 .loci-markdown .hljs-bullet,
@@ -179,7 +211,6 @@ body {
   color: #86efac;
 }
 
-/* Tags/names: #67e8f9 (cyan-300) — contrast 7.4:1 ✓ */
 .loci-markdown .hljs-section,
 .loci-markdown .hljs-name,
 .loci-markdown .hljs-selector-tag,

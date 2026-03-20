@@ -26,10 +26,11 @@ import {
   AlertCircle,
   User,
   Bot,
-  GripVertical,
+  GripVertical as _GripVertical,
   Archive,
   CheckSquare,
   X,
+  MoreHorizontal,
 } from 'lucide-react'
 import { fetchProject, fetchTickets, updateTicket, createTicket } from '../api/client'
 import { useSSE } from '../hooks/useSSE'
@@ -161,10 +162,8 @@ export function ProjectBoardPage() {
   function handleDragOver(event: DragOverEvent) {
     const { over } = event
     if (!over) { setOverColumnId(null); return }
-    // Check if hovering over a column directly
     const col = COLUMNS.find((c) => c.id === over.id)
     if (col) { setOverColumnId(col.id); return }
-    // Hovering over a ticket card — resolve its column
     const overTicket = filteredTickets.find((t) => t.id === over.id)
     if (overTicket) { setOverColumnId(overTicket.status); return }
     setOverColumnId(null)
@@ -176,11 +175,8 @@ export function ProjectBoardPage() {
     const { active, over } = event
     if (!over || active.id === over.id) return
 
-    // Determine target column — either directly from column id or by finding
-    // which column the hovered ticket belongs to
     let targetStatus = COLUMNS.find((c) => c.id === over.id)?.id
     if (!targetStatus) {
-      // Dropped over a ticket card — find its column
       const overTicket = filteredTickets.find((t) => t.id === over.id)
       if (overTicket) targetStatus = overTicket.status
     }
@@ -206,15 +202,14 @@ export function ProjectBoardPage() {
   }
 
   if (error || !project) {
-    // Detect server offline vs. project not found
     const isOffline = error instanceof TypeError && error.message.includes('fetch')
     return (
       <div style={styles.center}>
-        <AlertCircle size={32} style={{ color: 'var(--color-priority-high)', marginBottom: '12px' }} />
-        <h2 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--color-text)', margin: '0 0 6px' }}>
+        <AlertCircle size={32} style={{ color: 'var(--color-error)', marginBottom: '12px' }} />
+        <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--color-on-surface)', margin: '0 0 6px' }}>
           {isOffline ? 'Cannot connect to Loci server' : 'Project not found'}
         </h2>
-        <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', margin: '0 0 16px', textAlign: 'center' }}>
+        <p style={{ fontSize: '13px', color: 'var(--color-on-surface-variant)', margin: '0 0 16px', textAlign: 'center' }}>
           {isOffline
             ? 'Make sure the server is running: loci serve'
             : `No project found with ID: ${projectId}`}
@@ -234,31 +229,52 @@ export function ProjectBoardPage() {
     )
   }
 
+  const totalTickets = filteredTickets.length
+
   return (
     <div style={styles.page}>
-      {/* Page header */}
-      <div style={styles.header}>
-        <div>
-          <h1 id="board-heading" style={styles.heading}>
-            {project.name}
-          </h1>
-          <span style={styles.prefixBadge}>{project.prefix}</span>
-        </div>
+      {/* Row 1: Project name + task count */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '16px 0 8px' }}>
+        <h1 id="board-heading" style={styles.heading}>
+          {project.name}
+        </h1>
+        <span style={styles.prefixBadge}>{totalTickets} TASKS</span>
+      </div>
 
-        <div style={styles.headerActions}>
+      {/* Row 2: New Ticket + View toggle + Archived + Select */}
+      <div style={styles.header}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {/* New ticket button */}
           <button
             id="new-ticket-btn"
             onClick={() => setShowNewTicket(true)}
             style={styles.newTicketBtn}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-hover, #EA6C08)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-accent)')}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.9')}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
           >
             <Plus size={14} />
             New Ticket
           </button>
 
-          {/* Show archived toggle */}
+          {/* View toggle */}
+          <div style={styles.viewToggle}>
+            <ToggleButton
+              id="view-kanban-btn"
+              active={viewMode === 'kanban'}
+              onClick={() => setViewMode('kanban')}
+              icon={<LayoutGrid size={14} />}
+              label="Board"
+            />
+            <ToggleButton
+              id="view-list-btn"
+              active={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+              icon={<List size={14} />}
+              label="List"
+            />
+          </div>
+
+          {/* Archived toggle */}
           <ToggleButton
             id="toggle-archived-btn"
             active={showArchived}
@@ -275,25 +291,17 @@ export function ProjectBoardPage() {
             icon={<CheckSquare size={14} />}
             label="Select"
           />
-
-          {/* View toggle */}
-          <div style={styles.viewToggle}>
-            <ToggleButton
-              id="view-kanban-btn"
-              active={viewMode === 'kanban'}
-              onClick={() => setViewMode('kanban')}
-              icon={<LayoutGrid size={14} />}
-              label="Kanban"
-            />
-            <ToggleButton
-              id="view-list-btn"
-              active={viewMode === 'list'}
-              onClick={() => setViewMode('list')}
-              icon={<List size={14} />}
-              label="List"
-            />
-          </div>
         </div>
+      </div>
+
+      {/* Row 3: Search + Filters (single line) */}
+      <div style={styles.topBar}>
+        <FilterBar
+          tickets={tickets}
+          filters={filters}
+          onChange={setFilters}
+          onClear={() => setFilters(EMPTY_FILTERS)}
+        />
       </div>
 
       {/* New ticket form */}
@@ -329,14 +337,6 @@ export function ProjectBoardPage() {
         </div>
       )}
 
-      {/* Filter bar */}
-      <FilterBar
-        tickets={tickets}
-        filters={filters}
-        onChange={setFilters}
-        onClear={() => setFilters(EMPTY_FILTERS)}
-      />
-
       {/* Board */}
       {viewMode === 'kanban' ? (
         <DndContext
@@ -351,7 +351,6 @@ export function ProjectBoardPage() {
               const colTickets = filteredTickets
                 .filter((t) => t.status === col.id)
                 .sort((a, b) => {
-                  // Archived tickets go to bottom
                   const aArch = a.archived ? 1 : 0
                   const bArch = b.archived ? 1 : 0
                   if (aArch !== bArch) return aArch - bArch
@@ -448,18 +447,17 @@ function KanbanColumn({
       id={`kanban-col-${column.id}`}
       style={{
         ...styles.column,
-        background: isHighlighted ? '#F0FDFA' : 'var(--color-background)',
-        borderColor: isHighlighted ? 'var(--color-primary)' : 'var(--color-border)',
-        transition: 'border-color 150ms ease, background 150ms ease',
+        background: isHighlighted ? 'rgba(0, 104, 95, 0.03)' : 'transparent',
+        transition: 'background 150ms ease',
       }}
     >
       {/* Column header */}
       <div style={styles.columnHeader}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ ...styles.statusDot, background: statusColors[column.id] }} />
           <span style={styles.columnTitle}>{column.label}</span>
+          <span style={styles.countBadge}>{tickets.length}</span>
         </div>
-        <span style={styles.countBadge}>{tickets.length}</span>
+        <MoreHorizontal size={16} color="var(--color-on-surface-variant)" style={{ opacity: 0.5 }} />
       </div>
 
       {/* Tickets */}
@@ -478,7 +476,8 @@ function KanbanColumn({
 
           {tickets.length === 0 && (
             <div style={styles.dropZone}>
-              Drop here
+              <Plus size={14} style={{ marginRight: '6px' }} />
+              Add Ticket
             </div>
           )}
         </div>
@@ -556,15 +555,54 @@ function TicketCard({
       style={{
         ...styles.ticketCard,
         boxShadow: isDragging
-          ? '0 8px 24px rgba(13,148,136,0.18)'
-          : '0 1px 3px rgba(0,0,0,0.06)',
+          ? '0 4px 20px rgba(25, 28, 30, 0.06)'
+          : 'none',
         cursor: isDragging ? 'grabbing' : 'grab',
         transform: isDragging ? 'rotate(2deg)' : 'none',
-        ...(isSelected ? { borderColor: 'var(--color-primary)', background: '#F0FDFA' } : {}),
+        ...(isSelected ? { background: 'rgba(0, 104, 95, 0.04)', boxShadow: '0 0 0 1px var(--color-primary)' } : {}),
       }}
     >
-      {/* Top row: checkbox + drag handle + ID (left), priority + assignee (right) */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Ticket ID at top */}
+      <Link
+        to={`/project/${projectId}/${ticket.id}`}
+        style={{ textDecoration: 'none' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--color-primary)', fontFamily: 'monospace' }}>{ticket.id}</span>
+      </Link>
+
+      {/* Labels */}
+      {ticket.labels.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+          {ticket.labels.map((label) => (
+            <span
+              key={label}
+              style={{
+                fontSize: '10px',
+                fontWeight: '700',
+                padding: '2px 8px',
+                borderRadius: '9999px',
+                background: 'var(--color-secondary-container)',
+                color: 'var(--color-on-secondary-container)',
+              }}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Title + ticket ID */}
+      <Link
+        to={`/project/${projectId}/${ticket.id}`}
+        style={{ textDecoration: 'none' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p style={styles.ticketTitle}>{ticket.title}</p>
+      </Link>
+
+      {/* Bottom row: ticket ID + priority + assignee */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {selectMode && onToggleSelect && (
             <input
@@ -575,49 +613,15 @@ function TicketCard({
               style={{ accentColor: 'var(--color-primary)', cursor: 'pointer', margin: 0 }}
             />
           )}
-          <div style={styles.dragHandle}>
-            <GripVertical size={12} color="var(--color-text-muted)" />
-          </div>
-          <Link
-            to={`/project/${projectId}/${ticket.id}`}
-            style={{ ...styles.ticketId, textDecoration: 'none' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {ticket.id}
-          </Link>
+          <PriorityBadge priority={ticket.priority} />
           {ticket.archived && (
             <span style={styles.archivedBadge}>Archived</span>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <PriorityBadge priority={ticket.priority} />
           {ticket.assignee && <AssigneeBadge assignee={ticket.assignee} />}
         </div>
       </div>
-
-      {/* Title */}
-      <p style={styles.ticketTitle}>{ticket.title}</p>
-
-      {/* Labels */}
-      {ticket.labels.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-          {ticket.labels.map((label) => (
-            <span
-              key={label}
-              style={{
-                fontSize: '11px',
-                fontWeight: '600',
-                padding: '2px 8px',
-                borderRadius: '20px',
-                background: '#CCFBF1',
-                color: 'var(--color-primary)',
-              }}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -646,7 +650,6 @@ function TicketTable({
   onToggleSelect: (ticketId: string) => void
 }) {
   const sorted = [...tickets].sort((a, b) => {
-    // Archived tickets always go to bottom
     const aArch = a.archived ? 1 : 0
     const bArch = b.archived ? 1 : 0
     if (aArch !== bArch) return aArch - bArch
@@ -694,9 +697,9 @@ function TicketTable({
               style={{
                 ...styles.tr,
                 opacity: ticket.archived ? 0.5 : 1,
-                ...(selectedTickets.has(ticket.id) ? { background: '#F0FDFA' } : {}),
+                ...(selectedTickets.has(ticket.id) ? { background: 'rgba(0, 104, 95, 0.04)' } : {}),
               }}
-              onMouseEnter={(e) => { if (!selectedTickets.has(ticket.id)) e.currentTarget.style.background = '#F8FFFE' }}
+              onMouseEnter={(e) => { if (!selectedTickets.has(ticket.id)) e.currentTarget.style.background = 'var(--color-surface-container-highest)' }}
               onMouseLeave={(e) => { if (!selectedTickets.has(ticket.id)) e.currentTarget.style.background = '' }}
             >
               {selectMode && (
@@ -721,7 +724,7 @@ function TicketTable({
                 </div>
               </td>
               <td style={{ ...styles.td, maxWidth: '300px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--color-text)', fontWeight: '500' }}>
+                <span style={{ fontSize: '13px', color: 'var(--color-on-surface)', fontWeight: '500' }}>
                   {ticket.title}
                 </span>
               </td>
@@ -732,7 +735,7 @@ function TicketTable({
                 <PriorityBadge priority={ticket.priority} />
               </td>
               <td style={styles.td}>
-                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                <span style={{ fontSize: '12px', color: 'var(--color-on-surface-variant)' }}>
                   {new Date(ticket.updatedAt).toLocaleDateString()}
                 </span>
               </td>
@@ -745,7 +748,7 @@ function TicketTable({
       </table>
 
       {sorted.length === 0 && (
-        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '14px' }}>
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-on-surface-variant)', fontSize: '13px' }}>
           No tickets yet — create one with the button above.
         </div>
       )}
@@ -778,7 +781,7 @@ function StatusBadge({ status }: { status: TicketStatus }) {
         alignItems: 'center',
         gap: '5px',
         padding: '2px 8px',
-        borderRadius: '20px',
+        borderRadius: '9999px',
         fontSize: '11px',
         fontWeight: '600',
         background: `${statusColors[status]}1A`,
@@ -792,7 +795,7 @@ function StatusBadge({ status }: { status: TicketStatus }) {
 }
 
 const priorityColors: Record<TicketPriority, string> = {
-  high: '#EF4444',
+  high: '#924628',
   medium: '#F59E0B',
   low: '#94A3B8',
 }
@@ -801,12 +804,10 @@ function PriorityBadge({ priority }: { priority: TicketPriority }) {
   return (
     <span
       style={{
-        display: 'inline-block',
-        padding: '1px 7px',
-        borderRadius: '4px',
+        display: 'inline-flex',
+        alignItems: 'center',
         fontSize: '11px',
         fontWeight: '600',
-        background: `${priorityColors[priority]}18`,
         color: priorityColors[priority],
       }}
     >
@@ -825,7 +826,7 @@ function AssigneeBadge({ assignee }: { assignee: string }) {
         alignItems: 'center',
         gap: '4px',
         fontSize: '11px',
-        color: 'var(--color-text-muted)',
+        color: 'var(--color-on-surface-variant)',
       }}
     >
       {isAgent ? <Bot size={11} /> : <User size={11} />}
@@ -861,11 +862,11 @@ function ToggleButton({
         gap: '5px',
         padding: '5px 10px',
         fontSize: '12px',
-        fontWeight: active ? '600' : '400',
-        color: active ? 'var(--color-primary)' : 'var(--color-text-muted)',
-        background: active ? '#CCFBF1' : 'transparent',
+        fontWeight: active ? '600' : '500',
+        color: active ? 'var(--color-primary)' : 'var(--color-on-surface-variant)',
+        background: active ? 'rgba(0, 104, 95, 0.08)' : 'transparent',
         border: 'none',
-        borderRadius: '5px',
+        borderRadius: '6px',
         cursor: 'pointer',
         fontFamily: 'inherit',
         transition: 'all 150ms ease',
@@ -887,57 +888,68 @@ const styles = {
     height: '100%',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '20px',
+    gap: '16px',
     overflow: 'hidden',
+    background: 'var(--color-surface-container-low)',
+  },
+  topBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexShrink: 0,
+    gap: '12px',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     flexShrink: 0,
+    flexWrap: 'wrap' as const,
+    gap: '12px',
   },
   heading: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: 'var(--color-text)',
+    fontSize: '1.5rem',
+    fontWeight: '800',
+    color: 'var(--color-on-surface)',
     margin: 0,
+    letterSpacing: '-0.02em',
   },
   prefixBadge: {
     fontSize: '10px',
     fontWeight: '700',
     letterSpacing: '0.05em',
-    padding: '1px 6px',
-    borderRadius: '4px',
-    background: '#CCFBF1',
+    padding: '3px 8px',
+    borderRadius: '9999px',
+    background: 'rgba(0, 104, 95, 0.08)',
     color: 'var(--color-primary)',
     display: 'inline-block',
-    marginTop: '4px',
   },
   headerActions: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+    flexWrap: 'wrap' as const,
   },
   newTicketBtn: {
     display: 'flex',
     alignItems: 'center',
     gap: '5px',
-    padding: '7px 14px',
-    borderRadius: '6px',
+    padding: '8px 16px',
+    borderRadius: '8px',
     border: 'none',
-    background: 'var(--color-accent)',
-    color: '#fff',
+    background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-container))',
+    color: 'var(--color-on-primary)',
     fontSize: '13px',
     fontWeight: '600',
     cursor: 'pointer',
     fontFamily: 'inherit',
-    transition: 'background 150ms ease',
+    transition: 'opacity 150ms ease',
   },
   viewToggle: {
     display: 'flex',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: '6px',
+    background: 'var(--color-surface-container-lowest)',
+    border: '1px solid rgba(188, 201, 198, 0.3)',
+    borderRadius: '8px',
     padding: '2px',
     gap: '2px',
   },
@@ -946,9 +958,9 @@ const styles = {
     gap: '8px',
     alignItems: 'center',
     padding: '12px 16px',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-primary)',
-    borderRadius: '8px',
+    background: 'var(--color-surface-container-lowest)',
+    border: '2px solid var(--color-primary)',
+    borderRadius: '10px',
     flexShrink: 0,
   },
   newTicketInput: {
@@ -956,13 +968,13 @@ const styles = {
     border: 'none',
     outline: 'none',
     fontSize: '14px',
-    color: 'var(--color-text)',
+    color: 'var(--color-on-surface)',
     background: 'transparent',
     fontFamily: 'inherit',
   },
   saveBtn: {
-    padding: '5px 12px',
-    borderRadius: '5px',
+    padding: '6px 14px',
+    borderRadius: '6px',
     border: 'none',
     background: 'var(--color-primary)',
     color: '#fff',
@@ -972,62 +984,54 @@ const styles = {
     fontFamily: 'inherit',
   },
   cancelBtn: {
-    padding: '5px 12px',
-    borderRadius: '5px',
-    border: '1px solid var(--color-border)',
+    padding: '6px 14px',
+    borderRadius: '6px',
+    border: '1px solid rgba(188, 201, 198, 0.3)',
     background: 'transparent',
-    color: 'var(--color-text-muted)',
+    color: 'var(--color-on-surface-variant)',
     fontSize: '13px',
     cursor: 'pointer',
     fontFamily: 'inherit',
   },
   kanban: {
     display: 'flex',
-    gap: '16px',
+    gap: '12px',
     flex: 1,
     overflow: 'auto',
   },
   column: {
     width: '280px',
     minWidth: '280px',
-    border: '1px solid var(--color-border)',
-    borderRadius: '12px',
+    borderRadius: '0',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column' as const,
     minHeight: 0,
+    /* No borders — tonal layering + spacing defines columns */
   },
   columnHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 14px',
-    borderBottom: '1px solid var(--color-border)',
-    background: 'var(--color-surface)',
+    padding: '10px 10px',
     flexShrink: 0,
   },
   columnTitle: {
-    fontSize: '12px',
+    fontSize: '13px',
     fontWeight: '600',
-    color: 'var(--color-text)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
+    color: 'var(--color-on-surface)',
+    letterSpacing: '-0.01em',
   },
   countBadge: {
     fontSize: '11px',
     fontWeight: '600',
     padding: '1px 6px',
     borderRadius: '10px',
-    background: 'var(--color-border)',
-    color: 'var(--color-text-muted)',
-  },
-  statusDot: {
-    width: '7px',
-    height: '7px',
-    borderRadius: '50%',
+    background: 'var(--color-surface-container-high)',
+    color: 'var(--color-on-surface-variant)',
   },
   columnBody: {
-    padding: '10px',
+    padding: '4px',
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '8px',
@@ -1035,61 +1039,51 @@ const styles = {
     flex: 1,
   },
   dropZone: {
-    border: '2px dashed var(--color-border)',
-    borderRadius: '8px',
+    border: '2px dashed rgba(188, 201, 198, 0.4)',
+    borderRadius: '10px',
     padding: '20px',
     textAlign: 'center' as const,
-    color: 'var(--color-text-muted)',
+    color: 'var(--color-on-surface-variant)',
     fontSize: '12px',
+    fontWeight: '500',
     minHeight: '60px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    cursor: 'pointer',
+    transition: 'all 150ms ease',
   },
   ticketCard: {
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: '8px',
-    padding: '12px',
+    background: 'var(--color-surface-container-lowest)',
+    border: 'none',
+    borderRadius: '10px',
+    padding: '14px',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: '8px',
+    gap: '6px',
     transition: 'box-shadow 150ms ease',
     userSelect: 'none' as const,
+    /* Ambient elevation via tonal contrast: white card on #f2f4f6 bg */
   },
   ticketId: {
     fontSize: '11px',
     fontWeight: '600',
-    color: 'var(--color-text-muted)',
+    color: 'var(--color-on-surface-variant)',
     fontFamily: 'monospace',
   },
   ticketTitle: {
     fontSize: '13px',
     fontWeight: '500',
-    color: 'var(--color-text)',
+    color: 'var(--color-on-surface)',
     margin: 0,
     lineHeight: 1.4,
   },
-  ticketFooter: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    flexWrap: 'wrap' as const,
-  },
-  dragHandle: {
-    cursor: 'grab',
-    display: 'flex',
-    alignItems: 'center',
-    padding: '2px',
-    borderRadius: '3px',
-    transition: 'background 100ms ease',
-  },
   tableWrapper: {
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
+    background: 'var(--color-surface-container-lowest)',
     borderRadius: '12px',
     overflow: 'auto',
     flex: 1,
+    /* No border — tonal layering */
   },
   table: {
     width: '100%',
@@ -1101,22 +1095,22 @@ const styles = {
     padding: '10px 16px',
     fontSize: '11px',
     fontWeight: '600',
-    color: 'var(--color-text-muted)',
+    color: 'var(--color-on-surface-variant)',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.05em',
-    borderBottom: '1px solid var(--color-border)',
+    borderBottom: '1px solid var(--color-surface-container-high)',
     cursor: 'pointer',
-    background: 'var(--color-background)',
+    background: 'var(--color-surface-container-low)',
     userSelect: 'none' as const,
     whiteSpace: 'nowrap' as const,
   },
   tr: {
-    borderBottom: '1px solid var(--color-border)',
+    borderBottom: '1px solid var(--color-surface-container-high)',
     transition: 'background 100ms ease',
   },
   td: {
     padding: '10px 16px',
-    verticalAlign: 'middle',
+    verticalAlign: 'middle' as const,
     whiteSpace: 'nowrap' as const,
   },
   center: {
@@ -1146,10 +1140,12 @@ const styles = {
     alignItems: 'center',
     gap: '12px',
     padding: '12px 20px',
-    background: 'var(--color-text)',
+    background: 'rgba(25, 28, 30, 0.9)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
     color: '#fff',
     borderRadius: '12px',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+    boxShadow: '0 4px 20px rgba(25, 28, 30, 0.12)',
     zIndex: 1000,
     fontSize: '13px',
     fontWeight: '600',
