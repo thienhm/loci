@@ -47,11 +47,13 @@ All data lives on disk under \`.loci/\` in the workspace root:
 .loci/
 ├── project.json          # project metadata + nextId counter
 ├── tickets/
-│   └── ${project.prefix}-001/
-│       ├── ticket.json   # ticket fields
-│       ├── description.md
-│       ├── attachments.json
-│       └── files/        # uploaded binary files
+│   ├── ${project.prefix}-001/
+│   │   ├── ticket.json   # ticket fields
+│   │   ├── description.md
+│   │   ├── attachments.json
+│   │   └── files/        # uploaded binary files
+│   └── archived/         # archived tickets moved here
+│       └── ${project.prefix}-002/
 \`\`\`
 
 A global registry at \`~/.loci/registry.json\` tracks all registered projects.
