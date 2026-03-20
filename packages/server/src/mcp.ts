@@ -254,6 +254,14 @@ export function createMcpServer(): McpServer {
         updatedAt: new Date().toISOString(),
       }
 
+      // Require summary.md before marking a ticket as done
+      if (updated.status === 'done' && existing.status !== 'done') {
+        const summary = readTicketDoc(entry.path, id, 'summary.md')
+        if (!summary) {
+          return errorResult(`Cannot set ticket ${id} to done: summary.md is required. Write a summary first using write_ticket_doc.`)
+        }
+      }
+
       writeTicket(entry.path, updated)
       return jsonResult(updated)
     }

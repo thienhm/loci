@@ -253,6 +253,23 @@ describe('update_ticket', () => {
     const raw = await callTool(client, 'update_ticket', { id: 'MCP-999', fields: { status: 'done' } })
     expect(raw.isError).toBe(true)
   })
+
+  it('rejects setting status to done without summary.md', async () => {
+    seedTicket('MCP-001')
+    const { client } = await buildClient()
+    const raw = await callTool(client, 'update_ticket', { id: 'MCP-001', fields: { status: 'done' } })
+    expect(raw.isError).toBe(true)
+    const text = (raw.content as Array<{ type: string; text: string }>)[0].text
+    expect(text).toContain('summary.md')
+  })
+
+  it('allows setting status to done when summary.md exists', async () => {
+    seedTicket('MCP-001')
+    const { client } = await buildClient()
+    await callTool(client, 'write_ticket_doc', { id: 'MCP-001', filename: 'summary.md', content: '# Done' })
+    const result = parseResult(await callTool(client, 'update_ticket', { id: 'MCP-001', fields: { status: 'done' } }))
+    expect(result.status).toBe('done')
+  })
 })
 
 // ---------------------------------------------------------------------------
