@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import type { Project, Registry, RegistryEntry, Ticket, TicketWithDocs } from '@loci/shared'
 
@@ -38,20 +38,32 @@ function getTicketsDir(workspaceRoot: string): string {
   return join(workspaceRoot, '.loci', 'tickets')
 }
 
-function getTicketDir(workspaceRoot: string, ticketId: string): string {
-  return join(getTicketsDir(workspaceRoot), ticketId)
+function getArchivedDir(workspaceRoot: string): string {
+  return join(getTicketsDir(workspaceRoot), 'archived')
 }
 
-export function listTickets(workspaceRoot: string): Ticket[] {
-  const ticketsDir = getTicketsDir(workspaceRoot)
-  if (!existsSync(ticketsDir)) return []
+/**
+ * Resolve the ticket directory — checks tickets/ first, then tickets/archived/.
+ */
+function getTicketDir(workspaceRoot: string, ticketId: string): string {
+  const activeDir = join(getTicketsDir(workspaceRoot), ticketId)
+  if (existsSync(activeDir)) return activeDir
 
-  const entries = readdirSync(ticketsDir, { withFileTypes: true })
+  const archivedDir = join(getArchivedDir(workspaceRoot), ticketId)
+  if (existsSync(archivedDir)) return archivedDir
+
+  // Default to active location (for new tickets)
+  return activeDir
+}
+
+function scanTicketsFromDir(dir: string): Ticket[] {
+  if (!existsSync(dir)) return []
+  const entries = readdirSync(dir, { withFileTypes: true })
   const tickets: Ticket[] = []
-
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    const ticketJsonPath = join(ticketsDir, entry.name, 'ticket.json')
+    if (entry.name === 'archived') continue
+    const ticketJsonPath = join(dir, entry.name, 'ticket.json')
     if (!existsSync(ticketJsonPath)) continue
     try {
       tickets.push(JSON.parse(readFileSync(ticketJsonPath, 'utf8')))
@@ -59,8 +71,13 @@ export function listTickets(workspaceRoot: string): Ticket[] {
       // skip malformed tickets
     }
   }
-
   return tickets
+}
+
+export function listTickets(workspaceRoot: string): Ticket[] {
+  const active = scanTicketsFromDir(getTicketsDir(workspaceRoot))
+  const archived = scanTicketsFromDir(getArchivedDir(workspaceRoot))
+  return [...active, ...archived]
 }
 
 export function readTicketWithDocs(workspaceRoot: string, ticketId: string): TicketWithDocs | null {
@@ -80,8 +97,28 @@ export function readTicketWithDocs(workspaceRoot: string, ticketId: string): Tic
 }
 
 export function writeTicket(workspaceRoot: string, ticket: Ticket): void {
-  const ticketDir = getTicketDir(workspaceRoot, ticket.id)
-  writeFileSync(join(ticketDir, 'ticket.json'), JSON.stringify(ticket, null, 2))
+  const currentDir = getTicketDir(workspaceRoot, ticket.id)
+
+  if (ticket.archived) {
+    // Move to archived if currently in tickets/
+    const archivedTarget = join(getArchivedDir(workspaceRoot), ticket.id)
+    if (currentDir !== archivedTarget && existsSync(currentDir)) {
+      mkdirSync(getArchivedDir(workspaceRoot), { recursive: true })
+      renameSync(currentDir, archivedTarget)
+      writeFileSync(join(archivedTarget, 'ticket.json'), JSON.stringify(ticket, null, 2))
+      return
+    }
+  } else {
+    // Move back to tickets/ if currently in archived/
+    const activeTarget = join(getTicketsDir(workspaceRoot), ticket.id)
+    if (currentDir !== activeTarget && existsSync(currentDir)) {
+      renameSync(currentDir, activeTarget)
+      writeFileSync(join(activeTarget, 'ticket.json'), JSON.stringify(ticket, null, 2))
+      return
+    }
+  }
+
+  writeFileSync(join(currentDir, 'ticket.json'), JSON.stringify(ticket, null, 2))
 }
 
 export function createTicket(workspaceRoot: string, ticket: Ticket): void {

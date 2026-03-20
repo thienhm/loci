@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import type { Ticket } from '@loci/shared'
@@ -27,6 +27,7 @@ function makeTicket(overrides: Partial<Ticket> = {}): Ticket {
     labels: [],
     assignee: null,
     progress: 0,
+    archived: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -205,5 +206,81 @@ describe('readAttachments / writeAttachments', () => {
     // Create ticket dir without attachments.json
     mkdirSync(join(tmpWorkspace, '.loci', 'tickets', 'TST-001'), { recursive: true })
     expect(readAttachments(tmpWorkspace, 'TST-001')).toEqual([])
+  })
+})
+
+describe('archived ticket folder structure', () => {
+  beforeEach(setupEnv)
+  afterEach(teardownEnv)
+
+  it('writeTicket moves ticket to archived/ when archived becomes true', () => {
+    seedWorkspace(tmpWorkspace)
+    createTicket(tmpWorkspace, makeTicket())
+
+    const archived = makeTicket({ archived: true })
+    writeTicket(tmpWorkspace, archived)
+
+    // Should exist in archived dir
+    expect(existsSync(join(tmpWorkspace, '.loci', 'tickets', 'archived', 'TST-001', 'ticket.json'))).toBe(true)
+    // Should NOT exist in tickets dir
+    expect(existsSync(join(tmpWorkspace, '.loci', 'tickets', 'TST-001', 'ticket.json'))).toBe(false)
+  })
+
+  it('writeTicket moves ticket back from archived/ when archived becomes false', () => {
+    seedWorkspace(tmpWorkspace)
+    createTicket(tmpWorkspace, makeTicket())
+
+    // Archive it
+    writeTicket(tmpWorkspace, makeTicket({ archived: true }))
+    // Unarchive it
+    writeTicket(tmpWorkspace, makeTicket({ archived: false }))
+
+    // Should exist in tickets dir again
+    expect(existsSync(join(tmpWorkspace, '.loci', 'tickets', 'TST-001', 'ticket.json'))).toBe(true)
+    // Should NOT exist in archived dir
+    expect(existsSync(join(tmpWorkspace, '.loci', 'tickets', 'archived', 'TST-001', 'ticket.json'))).toBe(false)
+  })
+
+  it('readTicketWithDocs resolves tickets from archived dir', () => {
+    seedWorkspace(tmpWorkspace)
+    createTicket(tmpWorkspace, makeTicket())
+    writeTicket(tmpWorkspace, makeTicket({ archived: true }))
+
+    const result = readTicketWithDocs(tmpWorkspace, 'TST-001')
+    expect(result).not.toBeNull()
+    expect(result!.archived).toBe(true)
+  })
+
+  it('listTickets returns both active and archived tickets', () => {
+    seedWorkspace(tmpWorkspace)
+    createTicket(tmpWorkspace, makeTicket({ id: 'TST-001' }))
+    createTicket(tmpWorkspace, makeTicket({ id: 'TST-002' }))
+
+    // Archive TST-002
+    writeTicket(tmpWorkspace, makeTicket({ id: 'TST-002', archived: true }))
+
+    const tickets = listTickets(tmpWorkspace)
+    expect(tickets).toHaveLength(2)
+    const ids = tickets.map(t => t.id).sort()
+    expect(ids).toEqual(['TST-001', 'TST-002'])
+  })
+
+  it('listTickets does not duplicate archived tickets', () => {
+    seedWorkspace(tmpWorkspace)
+    createTicket(tmpWorkspace, makeTicket())
+    writeTicket(tmpWorkspace, makeTicket({ archived: true }))
+
+    const tickets = listTickets(tmpWorkspace)
+    expect(tickets).toHaveLength(1)
+  })
+
+  it('writeTicket preserves docs when moving to archived', () => {
+    seedWorkspace(tmpWorkspace)
+    createTicket(tmpWorkspace, makeTicket())
+    writeTicketDoc(tmpWorkspace, 'TST-001', 'summary.md', '# Done')
+    writeTicket(tmpWorkspace, makeTicket({ archived: true }))
+
+    const doc = readTicketDoc(tmpWorkspace, 'TST-001', 'summary.md')
+    expect(doc).toBe('# Done')
   })
 })
