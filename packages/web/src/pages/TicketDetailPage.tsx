@@ -967,7 +967,6 @@ const styles = {
   docCard: {
     background: 'var(--color-surface-container-lowest)',
     borderRadius: '12px',
-    overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column' as const,
     maxHeight: '1400px',
@@ -1001,7 +1000,6 @@ const styles = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column' as const,
-    overflow: 'hidden',
   },
   docToolbar: {
     display: 'flex',
@@ -1067,7 +1065,7 @@ const styles = {
     fontFamily: 'monospace',
     color: 'var(--color-on-surface)',
     background: 'var(--color-surface-container-low)',
-    minHeight: 0,
+    minHeight: '400px',
     width: '100%',
     boxSizing: 'border-box' as const,
   },
