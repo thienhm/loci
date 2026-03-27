@@ -20,6 +20,7 @@ import {
   Archive,
   ArchiveRestore,
   ChevronRight,
+  ChevronDown,
   Paperclip,
   Copy,
 } from 'lucide-react'
@@ -175,12 +176,17 @@ export function TicketDetailPage() {
           )}
 
           {/* Ticket header card */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '16px', flexShrink: 0 }}>
             <TicketHeader ticket={ticket} onPatch={(fields) => patchMutation.mutate(fields)} />
           </div>
 
+          {/* Attachments section (collapsible) */}
+          <div style={{ marginBottom: '16px', flexShrink: 0 }}>
+            <AttachmentsSection projectId={projectId!} ticketId={ticketId!} />
+          </div>
+
           {/* Markdown tabs + viewer */}
-          <div style={{ ...styles.docCard, marginBottom: '16px' }}>
+          <div style={styles.docCard}>
             {/* Tab bar */}
             <div role="tablist" aria-label="Ticket sections" style={styles.tabBar}>
               {docFilenames.map((filename, i) => (
@@ -205,15 +211,13 @@ export function TicketDetailPage() {
 
             {/* Doc content */}
             <DocTab
+              key={activeTab}
               projectId={projectId!}
               ticketId={ticketId!}
               filename={activeTab}
               initialContent={ticket.docs[activeTab] ?? ''}
             />
           </div>
-
-          {/* Attachments section */}
-          <AttachmentsSection projectId={projectId!} ticketId={ticketId!} />
         </div>
 
         {/* Right column: Properties panel */}
@@ -587,6 +591,7 @@ function AttachmentsSection({
   ticketId: string
 }) {
   const queryClient = useQueryClient()
+  const [expanded, setExpanded] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploading, setUploading] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -645,15 +650,31 @@ function AttachmentsSection({
 
   return (
     <div style={styles.attachmentsCard}>
-      <h3 style={styles.attachmentsTitle}>
-        <Paperclip size={16} color="var(--color-primary)" />
-        Attachments ({files.length})
-      </h3>
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        style={styles.attachmentsToggle}
+      >
+        <div style={styles.attachmentsTitle}>
+          <Paperclip size={16} color="var(--color-primary)" />
+          Attachments ({files.length})
+        </div>
+        <ChevronDown
+          size={16}
+          color="var(--color-on-surface-variant)"
+          style={{
+            transition: 'transform 200ms ease',
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}
+        />
+      </button>
 
       <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} style={{ display: 'none' }} />
 
+      {!expanded ? null : (
+      <>
+
       {/* File grid + upload card */}
-      <div style={styles.fileGrid}>
+      <div style={{ ...styles.fileGrid, marginTop: '16px' }}>
         {files.map((file) => (
           <div
             key={file.name}
@@ -724,6 +745,8 @@ function AttachmentsSection({
           <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
           Uploading {uploading.length} file{uploading.length > 1 ? 's' : ''}…
         </div>
+      )}
+      </>
       )}
 
       {/* Preview modal */}
@@ -969,7 +992,9 @@ const styles = {
     borderRadius: '12px',
     display: 'flex',
     flexDirection: 'column' as const,
-    maxHeight: '1400px',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
   },
   tabBar: {
     display: 'flex',
@@ -1000,6 +1025,8 @@ const styles = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column' as const,
+    minHeight: 0,
+    overflow: 'hidden',
   },
   docToolbar: {
     display: 'flex',
@@ -1077,10 +1104,22 @@ const styles = {
     padding: '24px',
     flexShrink: 0,
   },
+  attachmentsToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    padding: 0,
+    margin: 0,
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'inherit',
+  },
   attachmentsTitle: {
     fontSize: '13px',
     fontWeight: '700' as const,
-    margin: '0 0 16px',
+    margin: 0,
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
