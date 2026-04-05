@@ -1,11 +1,29 @@
+# Dependencies
 node_modules/
 dist/
+
+# OS
 .DS_Store
 *.local
+
+# Secrets
 .env
+
+# AI agent sessions (not for public contributors)
 .agent/
+.claude/
+CLAUDE.md
+GEMINI.md
+LOCI.md
+tasks/
+
+# Dev workflow artifacts
 design-system/
 .worktrees/
-packages/server/public/
-.loci
+docs/plans/
+docs/design-system/
+docs/superpowers/
 .docs/
+
+# Loci data (users' ticket data)
+.loci
