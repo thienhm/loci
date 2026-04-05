@@ -1,8 +1,14 @@
 {
   "name": "loci",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first AI ticket management system with MCP integration",
-  "keywords": ["tickets", "mcp", "ai", "task-management", "local"],
+  "keywords": [
+    "tickets",
+    "mcp",
+    "ai",
+    "task-management",
+    "local"
+  ],
   "homepage": "https://github.com/thienhm/loci",
   "repository": {
     "type": "git",
@@ -12,7 +18,9 @@
   "bin": {
     "loci": "./packages/cli/src/index.ts"
   },
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "release": "bun run scripts/release.ts",
     "build": "bun run --filter '*' build",
