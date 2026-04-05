@@ -8,4 +8,4 @@ design-system/
 .worktrees/
 packages/server/public/
 .loci
-.loci
+.docs/
