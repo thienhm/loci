@@ -7,7 +7,8 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "paths": {
-      "@loci/shared": ["./packages/shared/src/index.ts"]
+      "@loci/shared": ["./packages/shared/src/index.ts"],
+      "@loci/server": ["./packages/server/src/server.ts"]
     }
   }
 }
