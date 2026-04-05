@@ -10,8 +10,6 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@loci/shared": "workspace:*",
-    "@loci/server": "workspace:*",
     "commander": "^12.1.0"
   }
 }
