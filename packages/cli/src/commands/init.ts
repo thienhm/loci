@@ -33,14 +33,15 @@ Project: ${project.name} | Prefix: ${project.prefix} | Server: http://localhost:
 
 Bun monorepo with four packages:
 
-| Package          | Role                                           |
-| ---------------- | ---------------------------------------------- |
-| \`packages/shared\`| Shared types (\`Ticket\`, \`Project\`, \`Registry\`) and utilities (\`formatId\`) |
-| \`packages/server\`| Fastify server — REST API, MCP endpoint, SSE   |
-| \`packages/cli\`   | CLI (\`loci init\`, \`loci serve\`)                 |
-| \`packages/web\`   | React + Vite web UI (Kanban board, ticket details) |
+| Package           | Role                                                                      |
+| ----------------- | ------------------------------------------------------------------------- |
+| \`packages/shared\` | Shared types (\`Ticket\`, \`Project\`, \`Registry\`) and utilities (\`formatId\`) |
+| \`packages/server\` | Fastify server — REST API, MCP endpoint, SSE                              |
+| \`packages/cli\`    | CLI (\`loci init\`, \`loci serve\`)                                           |
+| \`packages/web\`    | React + Vite web UI (Kanban board, ticket details)                        |
 
 ### Data Storage
+
 All data lives on disk under \`.loci/\` in the workspace root:
 
 \`\`\`
@@ -59,6 +60,7 @@ All data lives on disk under \`.loci/\` in the workspace root:
 A global registry at \`~/.loci/registry.json\` tracks all registered projects.
 
 ### Server Endpoints
+
 - **REST API**: \`http://localhost:${port}/api/...\` — full CRUD for projects, tickets, docs, attachments, files
 - **MCP**: \`http://localhost:${port}/mcp\` — Streamable HTTP (POST only)
 - **SSE**: \`http://localhost:${port}/api/projects/:projectId/events\` — real-time change notifications
@@ -75,20 +77,23 @@ bun run test         # runs cli + server tests
 ## Ticket Workflow
 
 ### Starting a Ticket
+
 1. Call \`get_ticket(<id>)\` and read \`description.md\`
 2. If the description is vague, ask the user to clarify → update \`description.md\` with the outcome
-3. Brainstorm the approach before touching any code
-4. Assign yourself: \`update_ticket(id, { assignee: "agent:<your-name>" })\`
-5. Ask the user: **"New git branch, git worktree, or work on the current branch?"**
-6. Set status to \`in_progress\`, create \`implementation_plan.md\`
+3. Assign yourself: \`update_ticket(id, { assignee: "agent:<your-name>" })\`, set status to \`in_progress\`
+4. Ask the user if they want to create a new branch or work on the current branch
+5. Using using-superpowers skill to start working on the ticket.
+6. Any generated documents should be saved in the ticket's folder.
 
 ### Completing a Ticket
+
 1. Write \`summary.md\` describing what was done
 2. Set status to \`in_review\`
 3. Ask the user to verify the implementation
 4. **Only set status to \`done\` when the user explicitly confirms** — never auto-close
 
 ## Document Conventions
+
 - \`description.md\`         → what the ticket is, acceptance criteria (always created)
 - \`design.md\`              → technical/UI design decisions (optional)
 - \`implementation_plan.md\` → step-by-step plan (optional)
@@ -98,11 +103,13 @@ bun run test         # runs cli + server tests
 - Any \`.md\` file in the ticket folder is shown as a tab in the UI
 
 ## Assignee Format
+
 - \`null\`              → unassigned
 - \`"human"\`           → project owner
 - \`"agent:<name>"\`   → AI agent, e.g. \`"agent:claude"\`, \`"agent:gemini"\`
 
 ## Status Values
+
 Flow: \`todo\` → \`in_progress\` → \`in_review\` → \`done\`
 
 - \`todo\`        — not started
@@ -128,31 +135,37 @@ delete_file(id, filename)
 ## REST API Reference
 
 ### Projects
-- \`GET    /api/projects\`                          — list all projects
-- \`GET    /api/projects/:projectId\`               — get project metadata
+
+- \`GET    /api/projects\` — list all projects
+- \`GET    /api/projects/:projectId\` — get project metadata
 
 ### Tickets
-- \`GET    /api/projects/:projectId/tickets\`       — list tickets (\`?status=\`, \`?assignee=\`, \`?archived=\`)
-- \`POST   /api/projects/:projectId/tickets\`       — create ticket
-- \`GET    /api/projects/:projectId/tickets/:id\`    — get ticket + docs
-- \`PATCH  /api/projects/:projectId/tickets/:id\`    — update ticket fields
+
+- \`GET    /api/projects/:projectId/tickets\` — list tickets (\`?status=\`, \`?assignee=\`, \`?archived=\`)
+- \`POST   /api/projects/:projectId/tickets\` — create ticket
+- \`GET    /api/projects/:projectId/tickets/:id\` — get ticket + docs
+- \`PATCH  /api/projects/:projectId/tickets/:id\` — update ticket fields
 
 ### Docs
-- \`GET    /api/projects/:projectId/tickets/:id/docs/:filename\`  — read doc
-- \`PUT    /api/projects/:projectId/tickets/:id/docs/:filename\`  — write doc (text/plain body)
+
+- \`GET    /api/projects/:projectId/tickets/:id/docs/:filename\` — read doc
+- \`PUT    /api/projects/:projectId/tickets/:id/docs/:filename\` — write doc (text/plain body)
 
 ### Attachments
-- \`GET    /api/projects/:projectId/tickets/:id/attachments\`     — list attachments
-- \`PUT    /api/projects/:projectId/tickets/:id/attachments\`     — update attachments list
+
+- \`GET    /api/projects/:projectId/tickets/:id/attachments\` — list attachments
+- \`PUT    /api/projects/:projectId/tickets/:id/attachments\` — update attachments list
 
 ### Files
-- \`GET    /api/projects/:projectId/tickets/:id/files\`            — list files
-- \`POST   /api/projects/:projectId/tickets/:id/files\`            — upload file (multipart)
-- \`GET    /api/projects/:projectId/tickets/:id/files/:filename\`  — download file
-- \`DELETE /api/projects/:projectId/tickets/:id/files/:filename\`  — delete file
+
+- \`GET    /api/projects/:projectId/tickets/:id/files\` — list files
+- \`POST   /api/projects/:projectId/tickets/:id/files\` — upload file (multipart)
+- \`GET    /api/projects/:projectId/tickets/:id/files/:filename\` — download file
+- \`DELETE /api/projects/:projectId/tickets/:id/files/:filename\` — delete file
 
 ### SSE
-- \`GET    /api/projects/:projectId/events\`        — real-time change stream
+
+- \`GET    /api/projects/:projectId/events\` — real-time change stream
 
 ## Ticket ID Format
 \`${project.prefix}-001\`, \`${project.prefix}-002\`, ... (3-digit min, grows naturally: ${project.prefix}-1000)
