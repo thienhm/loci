@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="packages/web/src/assets/logo.svg" alt="Loci Logo" width="128" />
+</p>
+
 # 🗂️ Loci
 
 **Local-first AI ticket management.** Run it in any project, track work with your AI assistant via MCP.
