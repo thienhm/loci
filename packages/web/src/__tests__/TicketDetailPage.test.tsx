@@ -36,6 +36,10 @@ vi.mock('../api/client', () => ({
   fetchAttachments: (...args: unknown[]) => mockFetchAttachments(...args),
   writeAttachments: (...args: unknown[]) => mockWriteAttachments(...args),
   updateTicket: (...args: unknown[]) => mockUpdateTicket(...args),
+  listFiles: vi.fn().mockResolvedValue([]),
+  uploadFile: vi.fn(),
+  getFileUrl: vi.fn().mockReturnValue('mock-url'),
+  deleteFile: vi.fn(),
 }))
 
 // Import AFTER vi.mock declarations so the mock is in place
@@ -89,7 +93,7 @@ describe('TicketDetailPage', () => {
 
       expect(screen.getByText('LCI-001')).toBeInTheDocument()
       expect(screen.getByRole('heading', { name: /test ticket/i })).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: /back to board/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /projects/i })).toBeInTheDocument()
     })
 
     it('renders at least two select elements (status and priority)', async () => {
@@ -160,7 +164,6 @@ describe('TicketDetailPage', () => {
 
       expect(document.getElementById('tab-description.md')).toBeInTheDocument()
       expect(document.getElementById('tab-plan.md')).toBeInTheDocument()
-      expect(document.getElementById('tab-attachments')).toBeInTheDocument()
     })
 
     it('description doc view renders by default', async () => {
@@ -247,7 +250,7 @@ describe('TicketDetailPage', () => {
       descTab.focus()
       await userEvent.keyboard('{ArrowLeft}')
 
-      expect(document.activeElement).toBe(document.getElementById('tab-attachments'))
+      expect(document.activeElement).toBe(document.getElementById('tab-plan.md'))
     })
 
     it('End key moves focus to the Attachments tab', async () => {
@@ -258,76 +261,18 @@ describe('TicketDetailPage', () => {
       descTab.focus()
       await userEvent.keyboard('{End}')
 
-      expect(document.activeElement).toBe(document.getElementById('tab-attachments'))
+      expect(document.activeElement).toBe(document.getElementById('tab-plan.md'))
     })
 
     it('Home key moves focus to the first tab', async () => {
       renderPage()
       await waitForTicketLoad()
 
-      const attachTab = document.getElementById('tab-attachments')!
-      attachTab.focus()
+      const planTab = document.getElementById('tab-plan.md')!
+      planTab.focus()
       await userEvent.keyboard('{Home}')
 
       expect(document.activeElement).toBe(document.getElementById('tab-description.md'))
-    })
-  })
-
-  // ── 5.3 Attachments tab ─────────────────────────────────────────────────────
-
-  describe('attachments tab', () => {
-    async function openAttachments() {
-      renderPage()
-      await waitForTicketLoad()
-      fireEvent.click(document.getElementById('tab-attachments')!)
-      await waitFor(() => expect(screen.getByText('src/foo.ts')).toBeInTheDocument())
-    }
-
-    it('renders existing attachments', async () => {
-      await openAttachments()
-      expect(screen.getByText('src/foo.ts')).toBeInTheDocument()
-    })
-
-    it('adding an attachment calls writeAttachments with updated list', async () => {
-      mockWriteAttachments.mockResolvedValue(['src/foo.ts', 'src/bar.ts'])
-      await openAttachments()
-
-      const input = document.getElementById('attachment-path-input') as HTMLInputElement
-      fireEvent.change(input, { target: { value: 'src/bar.ts' } })
-      fireEvent.click(document.getElementById('add-attachment-btn')!)
-
-      await waitFor(() =>
-        expect(mockWriteAttachments).toHaveBeenCalledWith(
-          'proj-1',
-          'LCI-001',
-          ['src/foo.ts', 'src/bar.ts']
-        )
-      )
-    })
-
-    it('removing an attachment calls writeAttachments without that path', async () => {
-      mockWriteAttachments.mockResolvedValue([])
-      await openAttachments()
-
-      fireEvent.click(document.getElementById('remove-attachment-src/foo.ts')!)
-
-      await waitFor(() =>
-        expect(mockWriteAttachments).toHaveBeenCalledWith(
-          'proj-1',
-          'LCI-001',
-          []
-        )
-      )
-    })
-
-    it('does not add a duplicate attachment', async () => {
-      await openAttachments()
-
-      const input = document.getElementById('attachment-path-input') as HTMLInputElement
-      fireEvent.change(input, { target: { value: 'src/foo.ts' } }) // duplicate
-      fireEvent.click(document.getElementById('add-attachment-btn')!)
-
-      expect(mockWriteAttachments).not.toHaveBeenCalled()
     })
   })
 })

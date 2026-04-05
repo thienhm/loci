@@ -19,6 +19,10 @@ vi.mock('../api/client', () => ({
   updateTicket: vi.fn(),
 }))
 
+vi.mock('../hooks/useSSE', () => ({
+  useSSE: vi.fn(),
+}))
+
 function makeWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -57,7 +61,7 @@ describe('App smoke tests', () => {
     )
     // Wait for the async query to resolve and heading to appear
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /all projects/i })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /active projects/i })).toBeInTheDocument()
     })
   })
 
@@ -86,7 +90,7 @@ describe('App smoke tests', () => {
       </Wrapper>
     )
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /all projects/i })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /active projects/i })).toBeInTheDocument()
     })
   })
 })
