@@ -18,6 +18,14 @@ export const addCommand = new Command('add')
       process.exit(1)
     }
 
+    const VALID_PRIORITIES = ['low', 'medium', 'high']
+    if (!VALID_PRIORITIES.includes(opts.priority)) {
+      const msg = `Invalid priority "${opts.priority}". Must be one of: low, medium, high`
+      if (opts.json) process.stderr.write(JSON.stringify({ error: msg }) + '\n')
+      else console.error(`Error: ${msg}`)
+      process.exit(1)
+    }
+
     const project = readProject(root)
     const id = formatId(project.prefix, project.nextId)
 
@@ -32,7 +40,7 @@ export const addCommand = new Command('add')
       id,
       title,
       status: 'todo',
-      priority: (opts.priority as TicketPriority) ?? 'medium',
+      priority: opts.priority as TicketPriority,
       labels: [],
       assignee: null,
       progress: 0,
