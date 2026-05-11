@@ -14,6 +14,7 @@ export const updateCommand = new Command('update')
     child.on('exit', (code) => {
       if (code === 0) {
         console.log('\n✓ Loci updated successfully!')
+        console.log('  Run `loci skill install` to update the AI agent skill.')
       } else {
         console.error('\n✗ Failed to update Loci. Exit code:', code)
         process.exit(code ?? 1)

@@ -12,13 +12,14 @@ import { getCommand } from './commands/get'
 import { patchCommand } from './commands/patch'
 import { docCommand } from './commands/doc'
 import { attachmentsCommand } from './commands/attachments'
+import { skillCommand } from './commands/skill'
 
 const program = new Command()
 
 program
   .name('loci')
   .description('Local ticket management tool')
-  .version('0.1.3')
+  .version('1.0.0')
 
 program.addCommand(initCommand)
 program.addCommand(addCommand)
@@ -32,5 +33,6 @@ program.addCommand(getCommand)
 program.addCommand(patchCommand)
 program.addCommand(docCommand)
 program.addCommand(attachmentsCommand)
+program.addCommand(skillCommand)
 
 program.parse()
