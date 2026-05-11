@@ -1,35 +1,13 @@
 import { Command } from 'commander'
-import { spawn } from 'child_process'
-import { rmSync, readdirSync, existsSync } from 'fs'
-import { join } from 'path'
-import { homedir } from 'os'
-
-function clearBunGitHubCache() {
-  const base = join(homedir(), '.bun', 'install')
-  // Remove cached tarball(s) for this package
-  const cacheDir = join(base, 'cache')
-  try {
-    for (const entry of readdirSync(cacheDir)) {
-      if (entry.startsWith('@GH@thienhm-loci-')) {
-        rmSync(join(cacheDir, entry), { recursive: true, force: true })
-      }
-    }
-  } catch {
-    // cache dir missing or unreadable — proceed anyway
-  }
-  // Remove global lockfile so bun re-resolves the latest commit
-  const lockfile = join(base, 'global', 'bun.lock')
-  if (existsSync(lockfile)) {
-    rmSync(lockfile, { force: true })
-  }
-}
+import { spawnSync, spawn } from 'child_process'
 
 export const updateCommand = new Command('update')
   .description('Pull the latest Loci version and update the global CLI')
   .action(() => {
     console.log('Fetching the latest Loci version from GitHub...')
 
-    clearBunGitHubCache()
+    // Remove first so bun clears the lockfile pin, forcing fresh resolution
+    spawnSync('bun', ['remove', '-g', 'loci'], { stdio: 'ignore', shell: true })
 
     const child = spawn('bun', ['install', '-g', 'github:thienhm/loci'], {
       stdio: 'inherit',
