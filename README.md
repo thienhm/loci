@@ -122,6 +122,20 @@ Loci also exposes an MCP server at `http://localhost:3333/mcp` (requires `loci s
 - The CLI reads directly from disk — no server needed for most operations
 - The MCP server and web UI (Kanban board + list view) are served by `loci serve`
 
+## Updating
+
+```bash
+loci update
+```
+
+If you're on an older version and `loci update` doesn't pull the latest, bootstrap once manually:
+
+```bash
+bun remove -g loci && bun install -g github:thienhm/loci
+```
+
+After that, `loci update` will always get the latest.
+
 ## Migrating from v0.1.x
 
 See [MIGRATION.md](MIGRATION.md) for the MCP → CLI migration guide.
