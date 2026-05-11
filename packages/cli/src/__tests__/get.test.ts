@@ -5,14 +5,17 @@ import { tmpdir } from 'os'
 
 let tmpHome: string
 let tmpWorkspace: string
+let origHome: string | undefined
 
 function setupEnv() {
+  origHome = process.env.HOME
   tmpHome = mkdtempSync(join(tmpdir(), 'loci-test-home-'))
   tmpWorkspace = mkdtempSync(join(tmpdir(), 'loci-test-ws-'))
   process.env.HOME = tmpHome
 }
 
 function teardownEnv() {
+  process.env.HOME = origHome
   rmSync(tmpHome, { recursive: true, force: true })
   rmSync(tmpWorkspace, { recursive: true, force: true })
 }
@@ -67,5 +70,32 @@ describe('getTicket', () => {
     const result = getTicket('TST-001', tmpWorkspace)
     expect(Object.keys(result.docs)).not.toContain('attachments.json')
     expect(Object.keys(result.docs)).not.toContain('ticket.json')
+  })
+
+  it('finds ticket in archived directory', () => {
+    const archivedDir = join(tmpWorkspace, '.loci', 'tickets', 'archived', 'TST-001')
+    mkdirSync(archivedDir, { recursive: true })
+    writeFileSync(
+      join(archivedDir, 'ticket.json'),
+      JSON.stringify({
+        id: 'TST-001',
+        title: 'Archived ticket',
+        status: 'done',
+        priority: 'low',
+        labels: [],
+        assignee: null,
+        progress: 100,
+        archived: true,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      }, null, 2)
+    )
+    writeFileSync(join(archivedDir, 'description.md'), '# Archived\n\nDone.')
+    // Make sure the regular tickets dir exists but doesn't have this ticket
+    mkdirSync(join(tmpWorkspace, '.loci', 'tickets'), { recursive: true })
+    const result = getTicket('TST-001', tmpWorkspace)
+    expect(result.id).toBe('TST-001')
+    expect(result.archived).toBe(true)
+    expect(result.docs['description.md']).toContain('Archived')
   })
 })
