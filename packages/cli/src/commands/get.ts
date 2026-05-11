@@ -54,9 +54,9 @@ export const getCommand = new Command('get')
         if (docFiles.length) console.log(`\nDocs: ${docFiles.join(', ')}`)
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (opts.json) process.stderr.write(JSON.stringify({ error: msg }) + '\n')
-      else console.error(`Error: ${msg}`)
+      const message = e instanceof Error ? e.message : String(e)
+      if (opts.json) process.stderr.write(JSON.stringify({ error: message }) + '\n')
+      else console.error(`Error: ${message}`)
       process.exit(1)
     }
   })
