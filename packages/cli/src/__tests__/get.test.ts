@@ -68,4 +68,32 @@ describe('getTicket', () => {
     expect(Object.keys(result.docs)).not.toContain('attachments.json')
     expect(Object.keys(result.docs)).not.toContain('ticket.json')
   })
+
+  it('finds ticket in archived directory', () => {
+    const archivedDir = join(tmpWorkspace, '.loci', 'tickets', 'archived', 'TST-002')
+    mkdirSync(archivedDir, { recursive: true })
+    writeFileSync(
+      join(archivedDir, 'ticket.json'),
+      JSON.stringify({
+        id: 'TST-002',
+        title: 'Archived ticket',
+        status: 'done',
+        priority: 'low',
+        labels: [],
+        assignee: null,
+        progress: 100,
+        archived: true,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      }, null, 2)
+    )
+    writeFileSync(join(archivedDir, 'description.md'), '# Archived\n\nDone.')
+    // Need tickets dir to exist
+    mkdirSync(join(tmpWorkspace, '.loci', 'tickets'), { recursive: true })
+
+    const result = getTicket('TST-002', tmpWorkspace)
+    expect(result.id).toBe('TST-002')
+    expect(result.archived).toBe(true)
+    expect(result.docs['description.md']).toContain('Done.')
+  })
 })

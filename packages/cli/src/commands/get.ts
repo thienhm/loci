@@ -53,9 +53,10 @@ export const getCommand = new Command('get')
         const docFiles = Object.keys(ticket.docs)
         if (docFiles.length) console.log(`\nDocs: ${docFiles.join(', ')}`)
       }
-    } catch (e: any) {
-      if (opts.json) process.stderr.write(JSON.stringify({ error: e.message }) + '\n')
-      else console.error(`Error: ${e.message}`)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e)
+      if (opts.json) process.stderr.write(JSON.stringify({ error: message }) + '\n')
+      else console.error(`Error: ${message}`)
       process.exit(1)
     }
   })
