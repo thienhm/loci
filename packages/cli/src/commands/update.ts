@@ -6,7 +6,7 @@ export const updateCommand = new Command('update')
   .action(() => {
     console.log('Fetching the latest Loci version from GitHub...')
 
-    const child = spawn('bun', ['install', '-g', 'github:thienhm/loci'], {
+    const child = spawn('bun', ['install', '-g', 'github:thienhm/loci', '--force'], {
       stdio: 'inherit',
       shell: true,
     })
