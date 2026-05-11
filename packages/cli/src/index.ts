@@ -10,6 +10,7 @@ import { updateCommand } from './commands/update'
 import { syncCommand } from './commands/sync'
 import { getCommand } from './commands/get'
 import { patchCommand } from './commands/patch'
+import { docCommand } from './commands/doc'
 
 const program = new Command()
 
@@ -28,5 +29,6 @@ program.addCommand(updateCommand)
 program.addCommand(syncCommand)
 program.addCommand(getCommand)
 program.addCommand(patchCommand)
+program.addCommand(docCommand)
 
 program.parse()
