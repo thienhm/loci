@@ -42,7 +42,7 @@ describe('readDoc', () => {
 
   it('throws when doc file not found', () => {
     seedTicket(tmpWorkspace)
-    expect(() => readDoc('TST-001', 'nonexistent.md', tmpWorkspace)).toThrow('Doc file "nonexistent.md" not found')
+    expect(() => readDoc('TST-001', 'nonexistent.md', tmpWorkspace)).toThrow('Doc file "nonexistent.md" not found in ticket TST-001')
   })
 })
 
