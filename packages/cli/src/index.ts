@@ -19,7 +19,7 @@ const program = new Command()
 program
   .name('loci')
   .description('Local ticket management tool')
-  .version('1.0.1')
+  .version('1.0.2')
 
 program.addCommand(initCommand)
 program.addCommand(addCommand)

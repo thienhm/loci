@@ -1,6 +1,6 @@
 {
   "name": "loci",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Local-first AI ticket management system with MCP integration",
   "keywords": [
     "tickets",
