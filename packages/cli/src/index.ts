@@ -9,6 +9,7 @@ import { openCommand } from './commands/open'
 import { updateCommand } from './commands/update'
 import { syncCommand } from './commands/sync'
 import { getCommand } from './commands/get'
+import { patchCommand } from './commands/patch'
 
 const program = new Command()
 
@@ -26,5 +27,6 @@ program.addCommand(openCommand)
 program.addCommand(updateCommand)
 program.addCommand(syncCommand)
 program.addCommand(getCommand)
+program.addCommand(patchCommand)
 
 program.parse()
