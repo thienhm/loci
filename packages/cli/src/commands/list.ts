@@ -7,6 +7,7 @@ import type { Ticket } from '@loci/shared'
 const STATUS_LABEL: Record<string, string> = {
   todo: 'Todo',
   in_progress: 'In Progress',
+  in_review: 'In Review',
   done: 'Done',
 }
 
@@ -18,15 +19,18 @@ const PRIORITY_LABEL: Record<string, string> = {
 
 export const listCommand = new Command('list')
   .description('List all tickets in the current project')
-  .action(() => {
+  .option('--json', 'Output as JSON')
+  .action((opts: { json?: boolean }) => {
     const root = findWorkspaceRoot()
     if (!root) {
-      console.error('Error: No Loci project found. Run `loci init` first.')
+      if (opts.json) process.stderr.write(JSON.stringify({ error: 'No Loci project found. Run `loci init` first.' }) + '\n')
+      else console.error('Error: No Loci project found. Run `loci init` first.')
       process.exit(1)
     }
 
     const ticketsDir = getTicketsDir(root)
     if (!existsSync(ticketsDir)) {
+      if (opts.json) { console.log('[]'); return }
       console.log('No tickets yet. Run `loci add "title"` to create one.')
       return
     }
@@ -48,15 +52,18 @@ export const listCommand = new Command('list')
       ...scanDir(join(ticketsDir, 'archived')),
     ]
 
+    tickets.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+
+    if (opts.json) {
+      console.log(JSON.stringify(tickets, null, 2))
+      return
+    }
+
     if (tickets.length === 0) {
       console.log('No tickets yet. Run `loci add "title"` to create one.')
       return
     }
 
-    // Sort by createdAt descending (newest first)
-    tickets.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-
-    // Print table
     const idW = 10, titleW = 40, statusW = 12, prioW = 6, assigneeW = 16
     const header = [
       'ID'.padEnd(idW),
