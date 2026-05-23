@@ -286,9 +286,12 @@ LOCI.md
 - For ticket work, run `loci get <ticket-id> --json`.
 - Follow validation, evidence, and trace rules before review.
 
-`LOCI.md` should be the generated operating guide:
+`LOCI.md` should be the generated operating guide for commands and workflow.
+It should not embed current project summary snippets or duplicate project truth
+from `loci/project.md`, `loci/architecture.md`, or other harness docs.
 
-- Folder structure.
+It should include:
+
 - CLI commands.
 - Ticket lifecycle.
 - Intake rules.
@@ -298,6 +301,7 @@ LOCI.md
 - Trace rules.
 - Done rules.
 - Safety gates.
+- Links to the relevant `loci/` docs.
 
 Loci should own marked generated sections:
 
@@ -356,6 +360,15 @@ loci evidence list LCI-001
 loci evidence show <evidence-id>
 ```
 
+`loci validate` should check validation requirements, readiness, evidence state,
+and review gates without running project commands.
+
+`loci validate --run` should execute validation commands in the first version,
+but only when those commands are explicitly declared in project or ticket
+validation docs. It must not invent commands. It should show the planned command
+set before execution, record results as evidence, and support non-interactive
+agent use with clear `--json` output.
+
 Trace commands:
 
 ```bash
@@ -388,6 +401,21 @@ loci template list
 loci template show story
 loci template apply story LCI-001
 ```
+
+Template packs are versioned bundles of starter harness content:
+
+- Generated `LOCI.md` command/workflow block.
+- `AGENTS.md` shim block.
+- Project docs such as `project.md`, `architecture.md`, and `validation.md`.
+- Ticket docs such as `story.md`, `design.md`, `plan.md`, `validation.md`,
+  `evidence.md`, and `summary.md`.
+- Decision, backlog, trace, and harness-delta templates.
+
+First-version behavior should use a built-in default template pack shipped with
+Loci. Each project should record the template pack version it was initialized
+or upgraded with. Global template updates can ship with `loci update`, but
+existing projects should only receive template changes through explicit
+`loci upgrade`.
 
 Every agent-facing command should support `--json`.
 
@@ -517,6 +545,10 @@ Ticket detail tabs:
 
 The dashboard should be dense, calm, scannable, and operational. It should not feel like a marketing site.
 
+The dashboard should support Markdown editing in the first version, matching
+current Loci behavior. The web UI may edit files under `loci/` directly while
+using SQLite to update indexes, timestamps, and workflow state.
+
 ## Workflow Gates
 
 To move to `ready`, require:
@@ -630,9 +662,16 @@ The CLI and database should define the product contract. The web UI should sit o
 - Cloud sync.
 - Multi-user hosted collaboration.
 
-## Open Questions
+## Resolved Review Decisions
 
-1. Should generated `LOCI.md` include only command/workflow instructions, or also current project summary snippets?
-2. Should `loci validate --run` execute commands in the first release, or only record expected proof and evidence?
-3. Should the web dashboard edit Markdown directly in the first release, or start as a read/query surface over CLI-managed docs?
-4. Should template packs be versioned globally, per project, or both?
+1. Generated `LOCI.md` should include only command/workflow instructions and
+   links to harness docs. It should not embed current project summary snippets.
+2. `loci validate --run` should execute commands in the first version, but only
+   explicitly configured validation commands. Plain `loci validate` should
+   inspect readiness, proof, and review-gate state without execution.
+3. The web dashboard should edit Markdown directly in the first version,
+   matching current Loci behavior.
+4. Template packs are versioned bundles of starter harness docs, ticket docs,
+   generated instruction blocks, and templates. Loci should ship a built-in
+   default template pack, record the per-project pack version, and apply
+   template updates to existing projects only through explicit `loci upgrade`.
