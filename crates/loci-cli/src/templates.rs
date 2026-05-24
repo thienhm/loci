@@ -40,7 +40,7 @@ Prefix: {prefix}
 ## Core Commands
 
 ```bash
-loci init
+loci init --name "My App" --prefix APP
 loci doctor
 loci list --json
 loci get <ticket-id> --json

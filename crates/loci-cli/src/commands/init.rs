@@ -4,6 +4,7 @@ use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use rusqlite::params;
+use serde::Serialize;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -23,6 +24,8 @@ pub fn run(name: &str, prefix: &str) -> Result<()> {
         .map(Into::into)
         .context("HOME is required to initialize the global Loci registry")?;
     let paths = LociPaths::new(workspace_root, home_dir);
+
+    ensure_not_initialized(&paths)?;
 
     fs::create_dir_all(&paths.visible_loci_dir)?;
     fs::create_dir_all(paths.visible_loci_dir.join("decisions"))?;
@@ -131,6 +134,17 @@ fn is_valid_prefix(prefix: &str) -> bool {
     (2..=5).contains(&prefix.len()) && prefix.chars().all(|char| char.is_ascii_uppercase())
 }
 
+fn ensure_not_initialized(paths: &LociPaths) -> Result<()> {
+    let has_visible_markers = paths.workspace_root.join("LOCI.md").exists()
+        && paths.visible_loci_dir.join("project.md").exists();
+
+    if paths.project_config.exists() || paths.project_db.exists() || has_visible_markers {
+        bail!("project already initialized");
+    }
+
+    Ok(())
+}
+
 fn write_if_missing(path: &Path, content: &str) -> Result<()> {
     if path.exists() {
         return Ok(());
@@ -145,15 +159,19 @@ fn write_if_missing(path: &Path, content: &str) -> Result<()> {
 }
 
 fn project_config(project: &ProjectRecord) -> String {
-    format!(
-        r#"project_id = "{id}"
-name = "{name}"
-prefix = "{prefix}"
-loci_version = "{version}"
-"#,
-        id = project.id,
-        name = project.name,
-        prefix = project.prefix,
-        version = project.loci_version
-    )
+    toml::to_string(&ProjectConfig {
+        project_id: project.id.clone(),
+        name: project.name.clone(),
+        prefix: project.prefix.clone(),
+        loci_version: project.loci_version.clone(),
+    })
+    .expect("project config should serialize")
+}
+
+#[derive(Serialize)]
+struct ProjectConfig {
+    project_id: String,
+    name: String,
+    prefix: String,
+    loci_version: String,
 }
