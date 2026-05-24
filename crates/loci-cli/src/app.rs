@@ -17,7 +17,15 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Initialize a Loci workspace in the current project.
-    Init,
+    Init {
+        /// Project display name.
+        #[arg(long)]
+        name: String,
+
+        /// Project ticket prefix, for example LCI.
+        #[arg(long)]
+        prefix: String,
+    },
 
     /// Check project harness health.
     Doctor {
@@ -48,7 +56,7 @@ pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Init => commands::init::run(),
+        Commands::Init { name, prefix } => commands::init::run(&name, &prefix),
         Commands::Doctor { json } => commands::doctor::run(json),
         Commands::List { json } => commands::list::run(json),
         Commands::Get { id, json } => commands::get::run(&id, json),
