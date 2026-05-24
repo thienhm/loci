@@ -198,6 +198,35 @@ pub fn update_ticket_packet_paths_and_state(
     Ok(())
 }
 
+pub fn update_ticket_readiness(
+    conn: &Connection,
+    id: &str,
+    status: &str,
+    readiness_state: &str,
+) -> Result<()> {
+    let updated = conn.execute(
+        r#"
+        UPDATE ticket
+        SET status = ?2,
+            readiness_state = ?3,
+            updated_at = ?4
+        WHERE id = ?1
+        "#,
+        params![
+            id,
+            status,
+            readiness_state,
+            OffsetDateTime::now_utc().format(&Rfc3339)?,
+        ],
+    )?;
+
+    if updated == 0 {
+        bail!("ticket {id} not found");
+    }
+
+    Ok(())
+}
+
 fn ticket_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TicketRecord> {
     let labels_json: String = row.get(5)?;
     let labels: Vec<String> = serde_json::from_str(&labels_json)

@@ -96,6 +96,15 @@ pub fn has_meaningful_content(body: &str) -> bool {
     })
 }
 
+pub fn has_checkable_step(markdown: &str) -> bool {
+    markdown.lines().any(|line| {
+        let trimmed = line.trim_start();
+        ["- [ ]", "- [x]", "- [X]"].iter().any(|marker| {
+            trimmed.starts_with(marker) && has_meaningful_content(&trimmed[marker.len()..])
+        })
+    })
+}
+
 fn strip_html_comments(input: &str) -> String {
     let mut output = String::with_capacity(input.len());
     let mut rest = input;

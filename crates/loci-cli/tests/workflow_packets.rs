@@ -34,6 +34,62 @@ fn add_packet(home: &TempDir, workspace: &TempDir) -> Value {
     serde_json::from_slice(&output).expect("json add output")
 }
 
+fn shape_complete_packet(home: &TempDir, workspace: &TempDir) -> Value {
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "shape",
+            "EXA-001",
+            "--intent",
+            "Build the first executable packet loop.",
+            "--scope",
+            "Add readiness checks for packet docs.",
+            "--out-of-scope",
+            "Do not implement evidence or trace execution.",
+            "--context",
+            "docs/superpowers/specs/2026-05-23-loci-native-harness-design.md",
+            "--acceptance",
+            "Ready refuses incomplete packets.",
+            "--risk-lane",
+            "normal",
+            "--validation",
+            "rtk cargo test -p loci-cli",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    serde_json::from_slice(&output).expect("json shape output")
+}
+
+fn plan_complete_packet(home: &TempDir, workspace: &TempDir) -> Value {
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "plan",
+            "EXA-001",
+            "--step",
+            "Write failing readiness tests.",
+            "--step",
+            "Implement the readiness command.",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    serde_json::from_slice(&output).expect("json plan output")
+}
+
 #[test]
 fn add_json_creates_idea_ticket_and_story_packet() {
     let (home, workspace) = initialized_workspace();
@@ -331,4 +387,55 @@ fn plan_replaces_command_owned_steps_when_run_again() {
 
     assert!(plan.contains("- [ ] New step."));
     assert!(!plan.contains("Old step."));
+}
+
+#[test]
+fn ready_json_fails_with_exact_missing_fields() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["ready", "EXA-001", "--json"])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json ready output");
+    assert_eq!(value["ok"], false);
+    assert_eq!(value["ready"], false);
+
+    let missing = value["missing"].as_array().expect("missing array");
+    assert!(missing.iter().any(|field| field["code"] == "story.intent"));
+    assert!(missing.iter().any(|field| field["code"] == "plan.steps"));
+}
+
+#[test]
+fn ready_json_marks_complete_packet_ready() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    shape_complete_packet(&home, &workspace);
+    plan_complete_packet(&home, &workspace);
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["ready", "EXA-001", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json ready output");
+    assert_eq!(value["ok"], true);
+    assert_eq!(value["ready"], true);
+    assert_eq!(value["ticket"]["status"], "ready");
+    assert_eq!(value["ticket"]["readiness_state"], "ready");
+    assert_eq!(value["missing"].as_array().expect("missing array").len(), 0);
 }

@@ -6,6 +6,7 @@ pub mod migrations;
 pub mod packet;
 pub mod paths;
 pub mod project;
+pub mod readiness;
 pub mod registry;
 pub mod templates;
 

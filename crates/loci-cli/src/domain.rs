@@ -64,6 +64,26 @@ pub struct WorkflowCommandResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MissingReadinessField {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReadinessReport {
+    pub ready: bool,
+    pub missing: Vec<MissingReadinessField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReadyCommandResponse {
+    pub ok: bool,
+    pub ready: bool,
+    pub ticket: TicketRecord,
+    pub missing: Vec<MissingReadinessField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum HealthStatus {
     Healthy,
     Warning,
