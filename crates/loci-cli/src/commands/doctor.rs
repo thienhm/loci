@@ -1,10 +1,18 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Result};
+use rusqlite::{Connection, OpenFlags};
 
-use crate::db::connect_project_db;
 use crate::domain::{DoctorReport, HealthCheck, HealthStatus};
 use crate::paths::{find_workspace_root, LociPaths};
+
+const REQUIRED_PROJECT_DB_TABLES: [&str; 5] = [
+    "schema_version",
+    "project",
+    "ticket",
+    "document",
+    "template_pack",
+];
 
 pub fn run(json: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
@@ -70,25 +78,7 @@ fn build_report(paths: &LociPaths) -> Result<DoctorReport> {
         &paths.visible_loci_dir.join("guardrails.md"),
         "loci/guardrails.md exists",
     );
-    require_file(
-        &mut checks,
-        "project_db",
-        &paths.project_db,
-        ".loci/loci.db exists",
-    );
-
-    match connect_project_db(&paths.project_db) {
-        Ok(_) => checks.push(HealthCheck {
-            code: "project_db_schema".to_string(),
-            status: HealthStatus::Healthy,
-            message: "project database schema is current".to_string(),
-        }),
-        Err(error) => checks.push(HealthCheck {
-            code: "project_db_schema".to_string(),
-            status: HealthStatus::Error,
-            message: format!("project database schema failed: {error}"),
-        }),
-    }
+    check_project_db(&mut checks, &paths.project_db);
 
     let status = if checks
         .iter()
@@ -124,6 +114,63 @@ fn require_file(checks: &mut Vec<HealthCheck>, code: &str, path: &Path, ok_messa
             status: HealthStatus::Error,
             message: format!("missing {}", display_path(path)),
         });
+    }
+}
+
+fn check_project_db(checks: &mut Vec<HealthCheck>, path: &Path) {
+    if !path.is_file() {
+        checks.push(HealthCheck {
+            code: "project_db".to_string(),
+            status: HealthStatus::Error,
+            message: format!("missing {}", display_path(path)),
+        });
+        return;
+    }
+
+    checks.push(HealthCheck {
+        code: "project_db".to_string(),
+        status: HealthStatus::Healthy,
+        message: ".loci/loci.db exists".to_string(),
+    });
+
+    match inspect_project_db_schema(path) {
+        Ok(()) => checks.push(HealthCheck {
+            code: "project_db_schema".to_string(),
+            status: HealthStatus::Healthy,
+            message: "project database schema has required tables".to_string(),
+        }),
+        Err(error) => checks.push(HealthCheck {
+            code: "project_db_schema".to_string(),
+            status: HealthStatus::Error,
+            message: format!("project database schema failed: {error}"),
+        }),
+    }
+}
+
+fn inspect_project_db_schema(path: &Path) -> Result<()> {
+    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+
+    let mut missing = Vec::new();
+    for table in REQUIRED_PROJECT_DB_TABLES {
+        let exists: bool = conn.query_row(
+            "SELECT EXISTS(
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table' AND name = ?1
+            )",
+            [table],
+            |row| row.get(0),
+        )?;
+
+        if !exists {
+            missing.push(table);
+        }
+    }
+
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        bail!("missing required tables: {}", missing.join(", "))
     }
 }
 

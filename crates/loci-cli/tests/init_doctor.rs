@@ -256,6 +256,31 @@ fn doctor_json_reports_missing_required_doc() {
         .stdout(contains("validation.md"));
 }
 
+#[test]
+fn doctor_json_does_not_create_missing_project_db() {
+    let home = TempDir::new().expect("home");
+    let workspace = TempDir::new().expect("workspace");
+
+    fs::write(workspace.path().join("LOCI.md"), "# Existing Loci docs\n").expect("write LOCI.md");
+    fs::create_dir_all(workspace.path().join("loci")).expect("create loci dir");
+    fs::write(
+        workspace.path().join("loci/project.md"),
+        "# Existing project docs\n",
+    )
+    .expect("write project.md");
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["doctor", "--json"])
+        .assert()
+        .failure()
+        .stdout(contains("loci.db"));
+
+    assert!(!workspace.path().join(".loci/loci.db").exists());
+}
+
 fn assert_invalid_prefix(prefix: &str) {
     let home = TempDir::new().expect("home");
     let workspace = TempDir::new().expect("workspace");
