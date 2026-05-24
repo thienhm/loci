@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 use rusqlite::types::Type;
 use rusqlite::{params, Connection};
+use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
 
 use crate::domain::{ProjectRecord, TicketRecord};
 
@@ -156,6 +158,40 @@ pub fn get_ticket(conn: &Connection, id: &str) -> Result<Option<TicketRecord>> {
         Some(row) => Ok(Some(ticket_from_row(row)?)),
         None => Ok(None),
     }
+}
+
+pub fn update_ticket_packet_paths_and_state(
+    conn: &Connection,
+    id: &str,
+    status: Option<&str>,
+    risk_lane: Option<&str>,
+    story_path: Option<&str>,
+    plan_path: Option<&str>,
+    validation_path: Option<&str>,
+) -> Result<()> {
+    conn.execute(
+        r#"
+        UPDATE ticket
+        SET status = COALESCE(?2, status),
+            risk_lane = COALESCE(?3, risk_lane),
+            story_path = COALESCE(?4, story_path),
+            plan_path = COALESCE(?5, plan_path),
+            validation_path = COALESCE(?6, validation_path),
+            updated_at = ?7
+        WHERE id = ?1
+        "#,
+        params![
+            id,
+            status,
+            risk_lane,
+            story_path,
+            plan_path,
+            validation_path,
+            OffsetDateTime::now_utc().format(&Rfc3339)?,
+        ],
+    )?;
+
+    Ok(())
 }
 
 fn ticket_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TicketRecord> {

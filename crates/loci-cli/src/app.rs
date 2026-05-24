@@ -35,9 +35,33 @@ pub enum Commands {
         /// Ticket id, for example LCI-001.
         id: String,
 
+        /// Desired outcome for the workflow packet.
+        #[arg(long)]
+        intent: Vec<String>,
+
+        /// Work included in this packet.
+        #[arg(long)]
+        scope: Vec<String>,
+
+        /// Work excluded from this packet.
+        #[arg(long = "out-of-scope")]
+        out_of_scope: Vec<String>,
+
+        /// Context document or reference link.
+        #[arg(long)]
+        context: Vec<String>,
+
+        /// Acceptance criterion.
+        #[arg(long)]
+        acceptance: Vec<String>,
+
         /// Risk lane for the shaped work.
         #[arg(long, value_enum, default_value = "normal")]
         risk_lane: RiskLaneArg,
+
+        /// Validation command or requirement.
+        #[arg(long)]
+        validation: Vec<String>,
 
         /// Emit machine-readable JSON.
         #[arg(long)]
@@ -48,6 +72,10 @@ pub enum Commands {
     Plan {
         /// Ticket id, for example LCI-001.
         id: String,
+
+        /// Checkable implementation step.
+        #[arg(long)]
+        step: Vec<String>,
 
         /// Emit machine-readable JSON.
         #[arg(long)]
@@ -146,10 +174,30 @@ pub fn run() -> Result<()> {
         } => commands::add::run(&title, priority, json),
         Commands::Shape {
             id,
+            intent,
+            scope,
+            out_of_scope,
+            context,
+            acceptance,
             risk_lane,
+            validation,
             json,
-        } => commands::shape::run(&id, risk_lane, json),
-        Commands::Plan { id, json } => commands::plan::run(&id, json),
+        } => commands::shape::run(commands::shape::ShapeInput {
+            id,
+            intent,
+            scope,
+            out_of_scope,
+            context,
+            acceptance,
+            risk_lane,
+            validation,
+            json,
+        }),
+        Commands::Plan { id, step, json } => commands::plan::run(commands::plan::PlanInput {
+            id,
+            steps: step,
+            json,
+        }),
         Commands::Ready { id, json } => commands::ready::run(&id, json),
         Commands::Init { name, prefix } => commands::init::run(&name, &prefix),
         Commands::Doctor { json } => commands::doctor::run(json),
