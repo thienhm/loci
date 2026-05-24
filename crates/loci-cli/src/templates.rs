@@ -113,3 +113,34 @@ pub fn glossary_md() -> &'static str {
 pub fn backlog_md() -> &'static str {
     "# Harness Backlog\n\nCapture missing docs, validation gaps, and repeated agent friction.\n"
 }
+
+pub fn story_packet_md(id: &str, title: &str) -> String {
+    format!(
+        r#"# {id} {title}
+
+## Intent
+
+Describe the outcome this workflow packet should produce.
+
+## Scope
+
+- TBD
+
+## Out of Scope
+
+- TBD
+
+## Context Links
+
+- TBD
+
+## Acceptance Criteria
+
+- TBD
+
+## Risk Lane
+
+normal
+"#
+    )
+}
