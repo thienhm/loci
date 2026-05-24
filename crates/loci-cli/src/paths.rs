@@ -37,7 +37,7 @@ pub fn find_workspace_root(start_dir: &Path) -> Option<PathBuf> {
     let mut current = start_dir.to_path_buf();
 
     loop {
-        if current.join(".loci").is_dir() || current.join("loci").is_dir() {
+        if has_project_marker(&current) {
             return Some(current);
         }
 
@@ -45,4 +45,11 @@ pub fn find_workspace_root(start_dir: &Path) -> Option<PathBuf> {
             return None;
         }
     }
+}
+
+fn has_project_marker(path: &Path) -> bool {
+    path.join(".loci/loci.db").is_file()
+        || path.join(".loci/config.toml").is_file()
+        || path.join("LOCI.md").is_file()
+        || path.join("loci/project.md").is_file()
 }
