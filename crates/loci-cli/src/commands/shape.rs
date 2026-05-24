@@ -46,7 +46,7 @@ pub fn run(input: ShapeInput) -> Result<()> {
     story = packet::upsert_section(&story, "Out of Scope", &bullets(&input.out_of_scope));
     story = packet::upsert_section(&story, "Context Links", &bullets(&input.context));
     story = packet::upsert_section(&story, "Acceptance Criteria", &checklist(&input.acceptance));
-    story = packet::upsert_section(&story, "Risk Lane", input.risk_lane.as_str());
+    story = packet::set_section(&story, "Risk Lane", input.risk_lane.as_str());
     std::fs::write(&story_file, story)?;
 
     let validation_file = ticket_dir.join("validation.md");

@@ -180,6 +180,49 @@ fn shape_json_updates_story_validation_and_preserves_human_notes() {
 }
 
 #[test]
+fn shape_replaces_template_placeholders_without_duplicate_story_sections() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "shape",
+            "EXA-001",
+            "--intent",
+            "Replace template placeholders.",
+            "--scope",
+            "Only packet docs.",
+            "--out-of-scope",
+            "No readiness transition.",
+            "--context",
+            "docs/spec.md",
+            "--acceptance",
+            "Story has one intent section.",
+            "--risk-lane",
+            "high-risk",
+            "--validation",
+            "rtk cargo test -p loci-cli",
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let story_path = workspace.path().join("loci/tickets/EXA-001/story.md");
+    let story = std::fs::read_to_string(&story_path).expect("story packet");
+
+    assert_eq!(story.matches("## Intent").count(), 1);
+    assert_eq!(story.matches("## Scope").count(), 1);
+    assert_eq!(story.matches("## Risk Lane").count(), 1);
+    assert!(story.contains("## Intent\n\nReplace template placeholders."));
+    assert!(story.contains("## Risk Lane\n\nhigh_risk"));
+    assert!(!story.contains("Describe the outcome"));
+    assert!(!story.contains("- TBD"));
+}
+
+#[test]
 fn plan_json_writes_checkable_steps_without_marking_ready() {
     let (home, workspace) = initialized_workspace();
     add_packet(&home, &workspace);
