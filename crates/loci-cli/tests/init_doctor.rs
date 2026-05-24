@@ -86,6 +86,41 @@ fn init_fails_when_workspace_is_already_initialized() {
 }
 
 #[test]
+fn init_fails_when_only_loci_md_exists() {
+    let home = TempDir::new().expect("home");
+    let workspace = TempDir::new().expect("workspace");
+    fs::write(workspace.path().join("LOCI.md"), "# Existing Loci docs\n").expect("write LOCI.md");
+
+    let mut cmd = Command::cargo_bin("loci").expect("loci binary exists");
+    cmd.current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["init", "--name", "Example App", "--prefix", "EXA"])
+        .assert()
+        .failure()
+        .stderr(contains("already initialized"));
+}
+
+#[test]
+fn init_fails_when_only_project_md_exists() {
+    let home = TempDir::new().expect("home");
+    let workspace = TempDir::new().expect("workspace");
+    fs::create_dir_all(workspace.path().join("loci")).expect("create loci dir");
+    fs::write(
+        workspace.path().join("loci/project.md"),
+        "# Existing project docs\n",
+    )
+    .expect("write project.md");
+
+    let mut cmd = Command::cargo_bin("loci").expect("loci binary exists");
+    cmd.current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["init", "--name", "Example App", "--prefix", "EXA"])
+        .assert()
+        .failure()
+        .stderr(contains("already initialized"));
+}
+
+#[test]
 fn init_writes_parseable_toml_config_for_quoted_name() {
     let home = TempDir::new().expect("home");
     let workspace = TempDir::new().expect("workspace");

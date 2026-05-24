@@ -135,10 +135,11 @@ fn is_valid_prefix(prefix: &str) -> bool {
 }
 
 fn ensure_not_initialized(paths: &LociPaths) -> Result<()> {
-    let has_visible_markers = paths.workspace_root.join("LOCI.md").exists()
-        && paths.visible_loci_dir.join("project.md").exists();
-
-    if paths.project_config.exists() || paths.project_db.exists() || has_visible_markers {
+    if paths.project_config.exists()
+        || paths.project_db.exists()
+        || paths.workspace_root.join("LOCI.md").exists()
+        || paths.visible_loci_dir.join("project.md").exists()
+    {
         bail!("project already initialized");
     }
 
