@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rusqlite::types::Type;
 use rusqlite::{params, Connection};
 
 use crate::domain::{ProjectRecord, TicketRecord};
@@ -64,7 +65,8 @@ pub fn get_ticket(conn: &Connection, id: &str) -> Result<Option<TicketRecord>> {
 
 fn ticket_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TicketRecord> {
     let labels_json: String = row.get(5)?;
-    let labels = serde_json::from_str(&labels_json).unwrap_or_default();
+    let labels: Vec<String> = serde_json::from_str(&labels_json)
+        .map_err(|err| rusqlite::Error::FromSqlConversionFailure(5, Type::Text, Box::new(err)))?;
 
     Ok(TicketRecord {
         id: row.get(0)?,

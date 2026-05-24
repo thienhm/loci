@@ -1,4 +1,5 @@
 use loci_cli::db::{connect_project_db, connect_registry_db};
+use loci_cli::project::list_tickets;
 use rusqlite::Connection;
 use tempfile::TempDir;
 
@@ -40,4 +41,27 @@ fn registry_database_has_v1_tables() {
     for table in ["schema_version", "registered_project", "global_config"] {
         assert!(table_exists(&conn, table), "missing table {table}");
     }
+}
+
+#[test]
+fn list_tickets_errors_on_malformed_labels_json() {
+    let temp = TempDir::new().expect("tempdir");
+    let db_path = temp.path().join(".loci/loci.db");
+    let conn = connect_project_db(&db_path).expect("connect project db");
+
+    conn.execute(
+        r#"
+        INSERT INTO ticket (
+            id, title, status, priority, labels_json, created_at, updated_at
+        )
+        VALUES ('LCI-001', 'Bad labels', 'ready', 'medium', 'not-json', '2026-05-24T00:00:00Z', '2026-05-24T00:00:00Z')
+        "#,
+        [],
+    )
+    .expect("insert ticket");
+
+    assert!(
+        list_tickets(&conn).is_err(),
+        "malformed labels_json should return an error"
+    );
 }
