@@ -1,6 +1,7 @@
 use assert_cmd::Command;
 use predicates::str::contains;
 use rusqlite::Connection;
+use serde_json::Value;
 use tempfile::TempDir;
 
 fn initialized_workspace() -> (TempDir, TempDir) {
@@ -48,15 +49,20 @@ fn list_json_returns_tickets() {
     let (home, workspace) = initialized_workspace();
     seed_ticket(&workspace);
 
-    Command::cargo_bin("loci")
+    let output = Command::cargo_bin("loci")
         .expect("loci binary exists")
         .current_dir(workspace.path())
         .env("HOME", home.path())
         .args(["list", "--json"])
         .assert()
         .success()
-        .stdout(contains("\"id\":\"EXA-001\""))
-        .stdout(contains("\"title\":\"First story\""));
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json list output");
+    assert_eq!(value[0]["id"], "EXA-001");
+    assert_eq!(value[0]["title"], "First story");
 }
 
 #[test]
@@ -64,13 +70,34 @@ fn get_json_returns_ticket_and_docs() {
     let (home, workspace) = initialized_workspace();
     seed_ticket(&workspace);
 
-    Command::cargo_bin("loci")
+    let output = Command::cargo_bin("loci")
         .expect("loci binary exists")
         .current_dir(workspace.path())
         .env("HOME", home.path())
         .args(["get", "EXA-001", "--json"])
         .assert()
         .success()
-        .stdout(contains("\"id\":\"EXA-001\""))
-        .stdout(contains("First story body"));
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json get output");
+    assert_eq!(value["id"], "EXA-001");
+    assert_eq!(value["title"], "First story");
+    assert_eq!(value["docs"]["story.md"], "# Story\n\nFirst story body.");
+    assert!(value.get("ticket").is_none());
+}
+
+#[test]
+fn list_human_output_mentions_empty_workspace() {
+    let (home, workspace) = initialized_workspace();
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .arg("list")
+        .assert()
+        .success()
+        .stdout(contains("No tickets yet."));
 }

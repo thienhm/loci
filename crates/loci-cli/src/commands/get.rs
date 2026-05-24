@@ -4,16 +4,9 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::db::connect_project_db;
-use crate::domain::TicketRecord;
+use crate::domain::{TicketRecord, TicketWithDocs};
 use crate::paths::find_workspace_root;
 use crate::project;
-
-#[derive(serde::Serialize)]
-struct TicketResponse {
-    #[serde(flatten)]
-    ticket: TicketRecord,
-    docs: BTreeMap<String, String>,
-}
 
 pub fn run(id: &str, json: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
@@ -22,19 +15,21 @@ pub fn run(id: &str, json: bool) -> Result<()> {
     let conn = connect_project_db(&root.join(".loci/loci.db"))?;
     let ticket =
         project::get_ticket(&conn, id)?.ok_or_else(|| anyhow::anyhow!("ticket {id} not found"))?;
-    let ticket_response = TicketResponse {
+    let ticket_with_docs = TicketWithDocs {
         docs: read_docs(&root, &ticket)?,
         ticket,
     };
 
     if json {
-        println!("{}", serde_json::to_string(&ticket_response)?);
+        println!("{}", serde_json::to_string(&ticket_with_docs)?);
     } else {
         println!(
             "{} [{}] {}",
-            ticket_response.ticket.id, ticket_response.ticket.status, ticket_response.ticket.title
+            ticket_with_docs.ticket.id,
+            ticket_with_docs.ticket.status,
+            ticket_with_docs.ticket.title
         );
-        for (filename, content) in &ticket_response.docs {
+        for (filename, content) in &ticket_with_docs.docs {
             println!("\n--- {filename} ---\n{content}");
         }
     }

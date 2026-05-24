@@ -50,6 +50,7 @@ pub struct TicketRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TicketWithDocs {
+    #[serde(flatten)]
     pub ticket: TicketRecord,
     pub docs: std::collections::BTreeMap<String, String>,
 }
