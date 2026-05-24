@@ -25,6 +25,8 @@ pub fn run(name: &str, prefix: &str) -> Result<()> {
     let paths = LociPaths::new(workspace_root, home_dir);
 
     fs::create_dir_all(&paths.visible_loci_dir)?;
+    fs::create_dir_all(paths.visible_loci_dir.join("decisions"))?;
+    fs::create_dir_all(paths.visible_loci_dir.join("templates"))?;
     fs::create_dir_all(paths.visible_loci_dir.join("tickets"))?;
     fs::create_dir_all(&paths.project_state_dir)?;
 
@@ -118,15 +120,15 @@ pub fn run(name: &str, prefix: &str) -> Result<()> {
 }
 
 fn validate_prefix(prefix: &str) -> Result<()> {
-    if prefix.is_empty() {
-        bail!("project prefix cannot be empty");
-    }
-
-    if !prefix.chars().all(|char| char.is_ascii_uppercase()) {
-        bail!("project prefix must contain only uppercase ASCII letters");
+    if !is_valid_prefix(prefix) {
+        bail!("prefix must be 2-5 uppercase ASCII letters");
     }
 
     Ok(())
+}
+
+fn is_valid_prefix(prefix: &str) -> bool {
+    (2..=5).contains(&prefix.len()) && prefix.chars().all(|char| char.is_ascii_uppercase())
 }
 
 fn write_if_missing(path: &Path, content: &str) -> Result<()> {
