@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 dist/
+target/
 
 # OS
 .DS_Store
@@ -11,6 +12,8 @@ dist/
 
 # AI agent sessions (not for public contributors)
 .agent/
+.agents/
+.antigravitycli/
 .claude/
 CLAUDE.md
 GEMINI.md
