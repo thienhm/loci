@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use rusqlite::TransactionBehavior;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
@@ -13,9 +14,10 @@ use crate::templates;
 pub fn run(title: &str, priority: PriorityArg, json: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let root = find_workspace_root(&cwd).ok_or_else(|| anyhow!("not inside a Loci workspace"))?;
-    let conn = connect_project_db(&root.join(".loci/loci.db"))?;
-    let project_record = project::get_project(&conn)?;
-    let id = project::next_ticket_id(&conn, &project_record.prefix)?;
+    let mut conn = connect_project_db(&root.join(".loci/loci.db"))?;
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let project_record = project::get_project(&tx)?;
+    let id = project::next_ticket_id(&tx, &project_record.prefix)?;
     let story_path = packet::relative_ticket_doc_path(&id, "story.md");
     let now = OffsetDateTime::now_utc().format(&Rfc3339)?;
 
@@ -44,8 +46,12 @@ pub fn run(title: &str, priority: PriorityArg, json: bool) -> Result<()> {
     };
 
     let story_file = packet::ticket_dir(&root, &id).join("story.md");
-    packet::write_if_missing(&story_file, &templates::story_packet_md(&id, title))?;
-    project::insert_ticket(&conn, &ticket)?;
+    project::insert_ticket(&tx, &ticket)?;
+    packet::write_new(&story_file, &templates::story_packet_md(&id, title))?;
+    if let Err(error) = tx.commit() {
+        let _ = std::fs::remove_file(&story_file);
+        return Err(error.into());
+    }
 
     if json {
         println!("{}", serde_json::to_string(&ticket)?);

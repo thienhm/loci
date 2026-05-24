@@ -78,3 +78,26 @@ fn add_human_output_mentions_created_ticket() {
         .success()
         .stdout(contains("Created EXA-001"));
 }
+
+#[test]
+fn add_fails_when_next_story_packet_already_exists_without_db_row() {
+    let (home, workspace) = initialized_workspace();
+    let orphan_dir = workspace.path().join("loci/tickets/EXA-001");
+    std::fs::create_dir_all(&orphan_dir).expect("orphan packet dir");
+    std::fs::write(orphan_dir.join("story.md"), "# EXA-001 Orphan story\n").expect("orphan story");
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["add", "Real packet", "--json"])
+        .assert()
+        .failure()
+        .stderr(contains("story packet already exists"));
+
+    let conn = Connection::open(workspace.path().join(".loci/loci.db")).expect("open db");
+    let row_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM ticket", [], |row| row.get(0))
+        .expect("ticket row count");
+    assert_eq!(row_count, 0);
+}

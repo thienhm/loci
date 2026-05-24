@@ -49,6 +49,8 @@ pub fn get_project(conn: &Connection) -> Result<ProjectRecord> {
 }
 
 pub fn next_ticket_id(conn: &Connection, prefix: &str) -> Result<String> {
+    // Callers that create tickets must hold a SQLite write transaction before
+    // using this value; otherwise concurrent adds can allocate the same id.
     let pattern = format!("{prefix}-%");
     let mut stmt = conn.prepare("SELECT id FROM ticket WHERE id LIKE ?1")?;
     let rows = stmt.query_map([pattern], |row| row.get::<_, String>(0))?;
