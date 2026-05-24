@@ -207,6 +207,55 @@ fn init_keeps_project_db_and_registry_identity_consistent() {
     assert_eq!(registry_count, 1);
 }
 
+#[test]
+fn doctor_reports_healthy_after_init() {
+    let home = TempDir::new().expect("home");
+    let workspace = TempDir::new().expect("workspace");
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["init", "--name", "Example App", "--prefix", "EXA"])
+        .assert()
+        .success();
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .arg("doctor")
+        .assert()
+        .success()
+        .stdout(contains("healthy"));
+}
+
+#[test]
+fn doctor_json_reports_missing_required_doc() {
+    let home = TempDir::new().expect("home");
+    let workspace = TempDir::new().expect("workspace");
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["init", "--name", "Example App", "--prefix", "EXA"])
+        .assert()
+        .success();
+
+    std::fs::remove_file(workspace.path().join("loci/validation.md")).expect("remove validation");
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["doctor", "--json"])
+        .assert()
+        .failure()
+        .stdout(contains("\"status\":\"Error\""))
+        .stdout(contains("validation.md"));
+}
+
 fn assert_invalid_prefix(prefix: &str) {
     let home = TempDir::new().expect("home");
     let workspace = TempDir::new().expect("workspace");
