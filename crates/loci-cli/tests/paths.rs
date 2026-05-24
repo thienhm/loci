@@ -77,5 +77,8 @@ fn paths_use_visible_loci_and_hidden_project_state() {
     assert_eq!(paths.visible_loci_dir, root.path().join("loci"));
     assert_eq!(paths.project_state_dir, root.path().join(".loci"));
     assert_eq!(paths.project_db, root.path().join(".loci/loci.db"));
-    assert_eq!(paths.global_registry_db, home.path().join(".loci/registry.db"));
+    assert_eq!(
+        paths.global_registry_db,
+        home.path().join(".loci/registry.db")
+    );
 }
