@@ -41,11 +41,11 @@ pub fn run(input: ShapeInput) -> Result<()> {
     } else {
         templates::story_packet_md(&input.id, &ticket.title)
     };
-    story = packet::upsert_section(&story, "Intent", &paragraph(&input.intent));
-    story = packet::upsert_section(&story, "Scope", &bullets(&input.scope));
-    story = packet::upsert_section(&story, "Out of Scope", &bullets(&input.out_of_scope));
-    story = packet::upsert_section(&story, "Context Links", &bullets(&input.context));
-    story = packet::upsert_section(&story, "Acceptance Criteria", &checklist(&input.acceptance));
+    story = packet::set_section(&story, "Intent", &paragraph(&input.intent));
+    story = packet::set_section(&story, "Scope", &bullets(&input.scope));
+    story = packet::set_section(&story, "Out of Scope", &bullets(&input.out_of_scope));
+    story = packet::set_section(&story, "Context Links", &bullets(&input.context));
+    story = packet::set_section(&story, "Acceptance Criteria", &checklist(&input.acceptance));
     story = packet::set_section(&story, "Risk Lane", input.risk_lane.as_str());
     std::fs::write(&story_file, story)?;
 
@@ -53,7 +53,7 @@ pub fn run(input: ShapeInput) -> Result<()> {
     let validation_body = checklist(&input.validation);
     let validation = if validation_file.exists() {
         let existing = std::fs::read_to_string(&validation_file)?;
-        packet::upsert_section(&existing, "Validation Requirements", &validation_body)
+        packet::set_section(&existing, "Validation Requirements", &validation_body)
     } else {
         templates::validation_packet_md(&input.id, &input.validation)
     };

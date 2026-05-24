@@ -223,6 +223,54 @@ fn shape_replaces_template_placeholders_without_duplicate_story_sections() {
 }
 
 #[test]
+fn shape_replaces_command_owned_sections_when_run_again() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+
+    for (intent, validation) in [
+        ("Old intent.", "old validation command"),
+        ("New intent.", "new validation command"),
+    ] {
+        Command::cargo_bin("loci")
+            .expect("loci binary exists")
+            .current_dir(workspace.path())
+            .env("HOME", home.path())
+            .args([
+                "shape",
+                "EXA-001",
+                "--intent",
+                intent,
+                "--scope",
+                "Packet docs.",
+                "--out-of-scope",
+                "Review gates.",
+                "--context",
+                "docs/spec.md",
+                "--acceptance",
+                "Explicit values replace old command-owned sections.",
+                "--risk-lane",
+                "normal",
+                "--validation",
+                validation,
+                "--json",
+            ])
+            .assert()
+            .success();
+    }
+
+    let story = std::fs::read_to_string(workspace.path().join("loci/tickets/EXA-001/story.md"))
+        .expect("story packet");
+    let validation =
+        std::fs::read_to_string(workspace.path().join("loci/tickets/EXA-001/validation.md"))
+            .expect("validation packet");
+
+    assert!(story.contains("## Intent\n\nNew intent."));
+    assert!(!story.contains("Old intent."));
+    assert!(validation.contains("- [ ] new validation command"));
+    assert!(!validation.contains("old validation command"));
+}
+
+#[test]
 fn plan_json_writes_checkable_steps_without_marking_ready() {
     let (home, workspace) = initialized_workspace();
     add_packet(&home, &workspace);
@@ -255,4 +303,32 @@ fn plan_json_writes_checkable_steps_without_marking_ready() {
     let plan = std::fs::read_to_string(&plan_path).expect("plan packet");
     assert!(plan.contains("- [ ] Write failing workflow packet tests."));
     assert!(plan.contains("- [ ] Implement packet commands."));
+}
+
+#[test]
+fn plan_replaces_command_owned_steps_when_run_again() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["plan", "EXA-001", "--step", "Old step.", "--json"])
+        .assert()
+        .success();
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["plan", "EXA-001", "--step", "New step.", "--json"])
+        .assert()
+        .success();
+
+    let plan = std::fs::read_to_string(workspace.path().join("loci/tickets/EXA-001/plan.md"))
+        .expect("plan packet");
+
+    assert!(plan.contains("- [ ] New step."));
+    assert!(!plan.contains("Old step."));
 }

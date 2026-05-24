@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use rusqlite::types::Type;
 use rusqlite::{params, Connection};
 use time::format_description::well_known::Rfc3339;
@@ -169,7 +169,7 @@ pub fn update_ticket_packet_paths_and_state(
     plan_path: Option<&str>,
     validation_path: Option<&str>,
 ) -> Result<()> {
-    conn.execute(
+    let updated = conn.execute(
         r#"
         UPDATE ticket
         SET status = COALESCE(?2, status),
@@ -190,6 +190,10 @@ pub fn update_ticket_packet_paths_and_state(
             OffsetDateTime::now_utc().format(&Rfc3339)?,
         ],
     )?;
+
+    if updated == 0 {
+        bail!("ticket {id} not found");
+    }
 
     Ok(())
 }

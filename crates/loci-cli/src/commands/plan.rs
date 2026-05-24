@@ -30,7 +30,7 @@ pub fn run(input: PlanInput) -> Result<()> {
     let plan_body = templates::checklist(&input.steps);
     let plan = if plan_file.exists() {
         let existing = std::fs::read_to_string(&plan_file)?;
-        packet::upsert_section(&existing, "Implementation Steps", &plan_body)
+        packet::set_section(&existing, "Implementation Steps", &plan_body)
     } else {
         templates::plan_packet_md(&input.id, &input.steps)
     };
