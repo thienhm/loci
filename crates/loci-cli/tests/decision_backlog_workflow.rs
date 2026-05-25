@@ -585,3 +585,73 @@ fn backlog_list_filters_by_status_kind_and_ticket() {
     let items: Value = serde_json::from_slice(&output).expect("backlog list json");
     assert!(items.as_array().expect("backlog array").is_empty());
 }
+
+#[test]
+fn backlog_status_resolves_item_and_preserves_human_notes() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    let trace_id = add_trace(&home, &workspace);
+    add_backlog_item(&home, &workspace, &trace_id);
+
+    let backlog_path = workspace.path().join("loci/backlog.md");
+    let markdown = std::fs::read_to_string(&backlog_path).expect("backlog markdown");
+    std::fs::write(
+        &backlog_path,
+        format!(
+            "{}\n## Human Notes\n\nKeep this backlog note.\n",
+            markdown.trim_end()
+        ),
+    )
+    .expect("append human backlog notes");
+
+    let resolved_output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "backlog",
+            "status",
+            "HB-000001",
+            "resolved",
+            "--note",
+            "Added to generated LOCI.md rules.",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let resolved: Value = serde_json::from_slice(&resolved_output).expect("backlog status json");
+    assert_eq!(resolved["id"], "HB-000001");
+    assert_eq!(resolved["status"], "resolved");
+    assert_eq!(
+        resolved["resolution_note"],
+        "Added to generated LOCI.md rules."
+    );
+    assert!(resolved["resolved_at"].as_str().is_some());
+
+    let updated = std::fs::read_to_string(&backlog_path).expect("resolved backlog markdown");
+    assert!(updated.contains("`HB-000001` [resolved] missing_doc"));
+    assert!(updated.contains("## Human Notes"));
+    assert!(updated.contains("Keep this backlog note."));
+    assert!(updated.contains("Added to generated LOCI.md rules."));
+
+    let reopened_output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["backlog", "status", "HB-000001", "open", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let reopened: Value = serde_json::from_slice(&reopened_output).expect("backlog reopen json");
+    assert_eq!(reopened["status"], "open");
+    assert!(reopened["resolved_at"].is_null());
+    assert_eq!(
+        reopened["resolution_note"],
+        "Added to generated LOCI.md rules."
+    );
+}

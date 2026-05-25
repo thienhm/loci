@@ -840,6 +840,33 @@ pub fn get_backlog(conn: &Connection, id: &str) -> Result<Option<BacklogRecord>>
     }
 }
 
+pub fn update_backlog_status(
+    conn: &Connection,
+    id: &str,
+    status: &str,
+    note: Option<&str>,
+    resolved_at: Option<&str>,
+    updated_at: &str,
+) -> Result<()> {
+    let updated = conn.execute(
+        r#"
+        UPDATE backlog
+        SET status = ?2,
+            resolution_note = COALESCE(?3, resolution_note),
+            resolved_at = ?4,
+            updated_at = ?5
+        WHERE id = ?1
+        "#,
+        params![id, status, note, resolved_at, updated_at],
+    )?;
+
+    if updated == 0 {
+        bail!("backlog item {id} not found");
+    }
+
+    Ok(())
+}
+
 fn ticket_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TicketRecord> {
     let labels_json: String = row.get(5)?;
     let labels: Vec<String> = serde_json::from_str(&labels_json)

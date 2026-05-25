@@ -133,8 +133,57 @@ pub fn show(backlog_id: &str, json: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn status(_input: BacklogStatusInput) -> Result<()> {
-    println!("backlog status is not implemented yet");
+pub fn status(input: BacklogStatusInput) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let root = find_workspace_root(&cwd).ok_or_else(|| anyhow!("not inside a Loci workspace"))?;
+    let mut conn = connect_project_db(&root.join(".loci/loci.db"))?;
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let now = OffsetDateTime::now_utc().format(&Rfc3339)?;
+    let status = input.status.as_str();
+    let resolved_at = if matches!(input.status, BacklogStatusArg::Resolved) {
+        Some(now.as_str())
+    } else {
+        None
+    };
+
+    project::update_backlog_status(
+        &tx,
+        &input.backlog_id,
+        status,
+        input.note.as_deref(),
+        resolved_at,
+        &now,
+    )?;
+    let record = project::get_backlog(&tx, &input.backlog_id)?
+        .ok_or_else(|| anyhow!("backlog item {} not found", input.backlog_id))?;
+    let records = project::list_backlog(&tx, &BacklogListFilters::default())?;
+
+    let backlog_file = root.join("loci/backlog.md");
+    let previous_backlog = if backlog_file.exists() {
+        Some(std::fs::read_to_string(&backlog_file)?)
+    } else {
+        None
+    };
+    let existing = previous_backlog
+        .as_deref()
+        .map(str::to_string)
+        .unwrap_or_else(|| templates::backlog_md().to_string());
+    let updated = backlog::render_backlog_markdown(&existing, &records);
+    if let Some(parent) = backlog_file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&backlog_file, updated)?;
+
+    if let Err(error) = tx.commit() {
+        if let Some(previous) = previous_backlog {
+            let _ = std::fs::write(&backlog_file, previous);
+        } else {
+            let _ = std::fs::remove_file(&backlog_file);
+        }
+        return Err(error.into());
+    }
+
+    print_record(&record, input.json)?;
     Ok(())
 }
 
