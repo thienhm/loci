@@ -125,6 +125,41 @@ fn assert_single_decision_filter(
     assert_eq!(records[0]["id"], expected_id);
 }
 
+fn add_backlog_item(home: &TempDir, workspace: &TempDir, trace_id: &str) -> Value {
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "backlog",
+            "add",
+            "--title",
+            "Document trace evidence linking rules",
+            "--kind",
+            "missing-doc",
+            "--source",
+            "LCI-047 implementation handoff",
+            "--impact",
+            "Agents may forget evidence links can be attached to traces.",
+            "--recommendation",
+            "Add the rule to LOCI.md during the upgrade slice.",
+            "--ticket",
+            "EXA-001",
+            "--trace",
+            trace_id,
+            "--doc",
+            "LOCI.md",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    serde_json::from_slice(&output).expect("backlog add json")
+}
+
 #[test]
 fn decision_and_backlog_add_require_meaningful_titles() {
     let (home, workspace) = initialized_workspace();
@@ -161,6 +196,13 @@ fn init_creates_decision_table() {
     let (_home, workspace) = initialized_workspace();
 
     assert!(sqlite_table_exists(&workspace, "decision"));
+}
+
+#[test]
+fn init_creates_backlog_table() {
+    let (_home, workspace) = initialized_workspace();
+
+    assert!(sqlite_table_exists(&workspace, "backlog"));
 }
 
 #[test]
@@ -413,4 +455,133 @@ fn decision_verify_requires_meaningful_note() {
         .assert()
         .failure()
         .stderr(contains("decision verification note cannot be empty"));
+}
+
+#[test]
+fn backlog_add_creates_sqlite_record_and_renders_backlog_md() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    let trace_id = add_trace(&home, &workspace);
+
+    let item = add_backlog_item(&home, &workspace, &trace_id);
+
+    assert_eq!(item["id"], "HB-000001");
+    assert_eq!(item["kind"], "missing_doc");
+    assert_eq!(item["status"], "open");
+
+    let conn = Connection::open(project_db(&workspace)).expect("open project db");
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM backlog WHERE id = 'HB-000001'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("backlog row count");
+    assert_eq!(count, 1);
+
+    let markdown =
+        std::fs::read_to_string(workspace.path().join("loci/backlog.md")).expect("backlog md");
+    assert!(markdown.contains("<!-- LOCI:BACKLOG:BEGIN -->"));
+    assert!(
+        markdown.contains("`HB-000001` [open] missing_doc - Document trace evidence linking rules")
+    );
+
+    let list_output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["backlog", "list", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let items: Value = serde_json::from_slice(&list_output).expect("backlog list json");
+    assert_eq!(items.as_array().expect("backlog array").len(), 1);
+    assert_eq!(items[0]["id"], "HB-000001");
+
+    let show_output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["backlog", "show", "HB-000001", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let shown: Value = serde_json::from_slice(&show_output).expect("backlog show json");
+    assert_eq!(shown["id"], "HB-000001");
+    assert_eq!(shown["sources"][0], "LCI-047 implementation handoff");
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["backlog", "show", "HB-999999", "--json"])
+        .assert()
+        .failure()
+        .stderr(contains("backlog item HB-999999 not found"));
+
+    let backlog_path = workspace.path().join("loci/backlog.md");
+    let markdown = std::fs::read_to_string(&backlog_path).expect("backlog markdown");
+    std::fs::write(
+        &backlog_path,
+        format!(
+            "{}\n## Human Notes\n\nKeep this backlog note.\n",
+            markdown.trim_end()
+        ),
+    )
+    .expect("append human backlog notes");
+
+    let second = add_backlog_item(&home, &workspace, &trace_id);
+    assert_eq!(second["id"], "HB-000002");
+
+    let updated = std::fs::read_to_string(backlog_path).expect("rerendered backlog markdown");
+    assert!(updated.contains("`HB-000002` [open] missing_doc"));
+    assert!(updated.contains("## Human Notes"));
+    assert!(updated.contains("Keep this backlog note."));
+}
+
+#[test]
+fn backlog_list_filters_by_status_kind_and_ticket() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    let trace_id = add_trace(&home, &workspace);
+    let item = add_backlog_item(&home, &workspace, &trace_id);
+    let expected_id = item["id"].as_str().expect("backlog id");
+
+    for args in [
+        vec!["backlog", "list", "--status", "open", "--json"],
+        vec!["backlog", "list", "--kind", "missing-doc", "--json"],
+        vec!["backlog", "list", "--ticket", "EXA-001", "--json"],
+    ] {
+        let output = Command::cargo_bin("loci")
+            .expect("loci binary exists")
+            .current_dir(workspace.path())
+            .env("HOME", home.path())
+            .args(args)
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+        let items: Value = serde_json::from_slice(&output).expect("backlog list json");
+        let records = items.as_array().expect("backlog array");
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["id"], expected_id);
+    }
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["backlog", "list", "--status", "resolved", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let items: Value = serde_json::from_slice(&output).expect("backlog list json");
+    assert!(items.as_array().expect("backlog array").is_empty());
 }
