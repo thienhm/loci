@@ -1,7 +1,14 @@
 use anyhow::{bail, Result};
+use rusqlite::TransactionBehavior;
+use time::format_description::well_known::Rfc3339;
+use time::OffsetDateTime;
 
 use crate::app::{TraceEventTypeArg, TraceOutcomeArg};
+use crate::db::connect_project_db;
 use crate::domain::TraceListFilters;
+use crate::domain::TraceRecord;
+use crate::paths::find_workspace_root;
+use crate::project;
 use crate::trace;
 
 pub struct TraceAddInput {
@@ -32,22 +39,43 @@ pub fn add(input: TraceAddInput) -> Result<()> {
     trace::validate_required_text(&input.summary, trace::EMPTY_SUMMARY_ERROR)?;
     trace::validate_required_text(&input.actor, trace::EMPTY_ACTOR_ERROR)?;
 
-    let _ = (
-        input.id,
-        input.event_type.as_str(),
-        input.intake,
-        input.actions,
-        input.files_read,
-        input.files_changed,
-        input.commands,
-        input.errors,
-        input.decisions,
-        input.outcome.as_str(),
-        input.evidence_ids,
-        input.json,
-    );
+    let cwd = std::env::current_dir()?;
+    let root = find_workspace_root(&cwd).ok_or_else(|| anyhow::anyhow!("not inside a Loci workspace"))?;
+    let mut conn = connect_project_db(&root.join(".loci/loci.db"))?;
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    project::get_ticket(&tx, &input.id)?
+        .ok_or_else(|| anyhow::anyhow!("ticket {} does not exist", input.id))?;
 
-    bail!("trace add is not implemented yet")
+    let now = OffsetDateTime::now_utc().format(&Rfc3339)?;
+    let record = TraceRecord {
+        id: project::next_trace_id(&tx)?,
+        ticket_id: input.id,
+        actor: input.actor,
+        event_type: input.event_type.as_str().to_string(),
+        task_summary: input.summary,
+        intake: input.intake,
+        actions: input.actions,
+        files_read: input.files_read,
+        files_changed: input.files_changed,
+        commands: input.commands,
+        errors: input.errors,
+        decisions: input.decisions,
+        outcome: input.outcome.as_str().to_string(),
+        evidence_ids: input.evidence_ids,
+        created_at: now.clone(),
+    };
+
+    project::insert_trace(&tx, &record)?;
+    project::insert_trace_evidence_links(&tx, &record.id, &record.evidence_ids, &now)?;
+    tx.commit()?;
+
+    if input.json {
+        println!("{}", serde_json::to_string(&record)?);
+    } else {
+        println!("Recorded {} for {}", record.id, record.ticket_id);
+    }
+
+    Ok(())
 }
 
 pub fn list(input: TraceListInput) -> Result<()> {

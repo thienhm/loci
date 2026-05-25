@@ -4,7 +4,10 @@ use rusqlite::{params, Connection};
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
-use crate::domain::{EvidenceRecord, ProjectRecord, TicketRecord, ValidationRunRecord};
+use crate::domain::{
+    EvidenceRecord, ProjectRecord, TicketRecord, TraceListFilters, TraceRecord,
+    ValidationRunRecord,
+};
 
 pub fn insert_project(conn: &Connection, project: &ProjectRecord) -> Result<()> {
     conn.execute(
@@ -461,6 +464,136 @@ pub fn next_validation_run_id(conn: &Connection) -> Result<String> {
     Ok(format!("VR-{:06}", max_suffix + 1))
 }
 
+pub fn next_trace_id(conn: &Connection) -> Result<String> {
+    let mut stmt = conn.prepare("SELECT id FROM trace WHERE id LIKE 'TR-%'")?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+
+    let mut max_suffix = 0_i64;
+    for row in rows {
+        let id = row?;
+        let Some(suffix) = id.strip_prefix("TR-") else {
+            continue;
+        };
+        if suffix.len() == 6 && suffix.chars().all(|char| char.is_ascii_digit()) {
+            let number = suffix.parse::<i64>()?;
+            max_suffix = max_suffix.max(number);
+        }
+    }
+
+    Ok(format!("TR-{:06}", max_suffix + 1))
+}
+
+pub fn insert_trace(conn: &Connection, trace: &TraceRecord) -> Result<()> {
+    let actions_json = serde_json::to_string(&trace.actions)?;
+    let files_read_json = serde_json::to_string(&trace.files_read)?;
+    let files_changed_json = serde_json::to_string(&trace.files_changed)?;
+    let commands_json = serde_json::to_string(&trace.commands)?;
+    let errors_json = serde_json::to_string(&trace.errors)?;
+    let decisions_json = serde_json::to_string(&trace.decisions)?;
+
+    conn.execute(
+        r#"
+        INSERT INTO trace (
+            id, ticket_id, actor, event_type, task_summary, intake,
+            actions_json, files_read_json, files_changed_json, commands_json,
+            errors_json, decisions_json, outcome, created_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+        "#,
+        params![
+            trace.id,
+            trace.ticket_id,
+            trace.actor,
+            trace.event_type,
+            trace.task_summary,
+            trace.intake,
+            actions_json,
+            files_read_json,
+            files_changed_json,
+            commands_json,
+            errors_json,
+            decisions_json,
+            trace.outcome,
+            trace.created_at,
+        ],
+    )?;
+
+    Ok(())
+}
+
+pub fn insert_trace_evidence_links(
+    conn: &Connection,
+    trace_id: &str,
+    evidence_ids: &[String],
+    created_at: &str,
+) -> Result<()> {
+    for evidence_id in evidence_ids {
+        conn.execute(
+            r#"
+            INSERT INTO trace_evidence (trace_id, evidence_id, created_at)
+            VALUES (?1, ?2, ?3)
+            "#,
+            params![trace_id, evidence_id, created_at],
+        )?;
+    }
+
+    Ok(())
+}
+
+pub fn list_traces(conn: &Connection, filters: &TraceListFilters) -> Result<Vec<TraceRecord>> {
+    let mut traces = Vec::new();
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, ticket_id, actor, event_type, task_summary, intake,
+               actions_json, files_read_json, files_changed_json, commands_json,
+               errors_json, decisions_json, outcome, created_at
+        FROM trace
+        WHERE (?1 IS NULL OR ticket_id = ?1)
+          AND (?2 IS NULL OR actor = ?2)
+          AND (?3 IS NULL OR event_type = ?3)
+        ORDER BY created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map(
+        params![filters.ticket_id, filters.actor, filters.event_type],
+        trace_from_row,
+    )?;
+    for row in rows {
+        traces.push(with_trace_evidence_ids(conn, row?)?);
+    }
+
+    Ok(traces)
+}
+
+pub fn get_trace(conn: &Connection, id: &str) -> Result<Option<TraceRecord>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, ticket_id, actor, event_type, task_summary, intake,
+               actions_json, files_read_json, files_changed_json, commands_json,
+               errors_json, decisions_json, outcome, created_at
+        FROM trace
+        WHERE id = ?1
+        "#,
+    )?;
+
+    let mut rows = stmt.query([id])?;
+    match rows.next()? {
+        Some(row) => Ok(Some(with_trace_evidence_ids(conn, trace_from_row(row)?)?)),
+        None => Ok(None),
+    }
+}
+
+pub fn trace_count_for_ticket(conn: &Connection, ticket_id: &str) -> Result<usize> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM trace WHERE ticket_id = ?1",
+        [ticket_id],
+        |row| row.get(0),
+    )?;
+
+    Ok(count as usize)
+}
+
 fn ticket_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TicketRecord> {
     let labels_json: String = row.get(5)?;
     let labels: Vec<String> = serde_json::from_str(&labels_json)
@@ -507,4 +640,48 @@ fn evidence_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<EvidenceRecord
         outcome: row.get(11)?,
         created_at: row.get(12)?,
     })
+}
+
+fn trace_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TraceRecord> {
+    Ok(TraceRecord {
+        id: row.get(0)?,
+        ticket_id: row.get(1)?,
+        actor: row.get(2)?,
+        event_type: row.get(3)?,
+        task_summary: row.get(4)?,
+        intake: row.get(5)?,
+        actions: json_vec_from_row(row, 6)?,
+        files_read: json_vec_from_row(row, 7)?,
+        files_changed: json_vec_from_row(row, 8)?,
+        commands: json_vec_from_row(row, 9)?,
+        errors: json_vec_from_row(row, 10)?,
+        decisions: json_vec_from_row(row, 11)?,
+        outcome: row.get(12)?,
+        evidence_ids: Vec::new(),
+        created_at: row.get(13)?,
+    })
+}
+
+fn json_vec_from_row(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<Vec<String>> {
+    let value: String = row.get(index)?;
+    serde_json::from_str(&value)
+        .map_err(|err| rusqlite::Error::FromSqlConversionFailure(index, Type::Text, Box::new(err)))
+}
+
+fn with_trace_evidence_ids(conn: &Connection, mut trace: TraceRecord) -> Result<TraceRecord> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT evidence_id
+        FROM trace_evidence
+        WHERE trace_id = ?1
+        ORDER BY created_at ASC, evidence_id ASC
+        "#,
+    )?;
+    let rows = stmt.query_map([trace.id.as_str()], |row| row.get::<_, String>(0))?;
+    let mut evidence_ids = Vec::new();
+    for row in rows {
+        evidence_ids.push(row?);
+    }
+    trace.evidence_ids = evidence_ids;
+    Ok(trace)
 }
