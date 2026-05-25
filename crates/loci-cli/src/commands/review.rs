@@ -17,8 +17,14 @@ pub fn run(id: &str, skip_validation: Option<&str>, json: bool) -> Result<()> {
     let ticket = project::get_ticket(&conn, id)?.ok_or_else(|| anyhow!("ticket {id} not found"))?;
     let summary = read_summary(&root, &ticket)?;
     let evidence_count = project::list_evidence_for_ticket(&conn, id)?.len();
-    let missing =
-        review::evaluate_review(&ticket, summary.as_deref(), evidence_count, skip_validation);
+    let trace_count = project::trace_count_for_ticket(&conn, id)?;
+    let missing = review::evaluate_review(
+        &ticket,
+        summary.as_deref(),
+        evidence_count,
+        trace_count,
+        skip_validation,
+    );
 
     if !missing.is_empty() {
         let response = ReviewCommandResponse {

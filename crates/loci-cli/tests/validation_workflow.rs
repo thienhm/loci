@@ -60,6 +60,25 @@ fn mark_ticket_in_progress(workspace: &TempDir) {
     .expect("mark ticket in progress");
 }
 
+fn add_trace(home: &TempDir, workspace: &TempDir) {
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "trace",
+            "add",
+            "EXA-001",
+            "--summary",
+            "Implemented validation workflow.",
+            "--actor",
+            "agent:codex",
+            "--json",
+        ])
+        .assert()
+        .success();
+}
+
 #[test]
 fn evidence_add_list_show_updates_db_and_markdown() {
     let (home, workspace) = initialized_workspace();
@@ -254,6 +273,11 @@ fn validate_json_inspects_declared_commands_without_recording_evidence() {
     assert_eq!(value["declared_commands"][0], "rtk cargo test -p loci-cli");
     assert_eq!(value["evidence_count"], 0);
     assert_eq!(value["ready_for_review"], false);
+    assert!(value["missing"]
+        .as_array()
+        .expect("missing")
+        .iter()
+        .any(|field| field["code"] == "trace.records"));
 
     let conn = Connection::open(workspace.path().join(".loci/loci.db")).expect("open db");
     let count: i64 = conn
@@ -454,6 +478,7 @@ fn review_fails_when_summary_is_missing() {
         ])
         .assert()
         .success();
+    add_trace(&home, &workspace);
 
     let output = Command::cargo_bin("loci")
         .expect("loci binary exists")
@@ -495,6 +520,7 @@ fn review_fails_when_evidence_is_missing() {
         ])
         .assert()
         .success();
+    add_trace(&home, &workspace);
 
     let output = Command::cargo_bin("loci")
         .expect("loci binary exists")
@@ -554,6 +580,7 @@ fn review_fails_when_validation_is_missing_without_skip_reason() {
         ])
         .assert()
         .success();
+    add_trace(&home, &workspace);
 
     let output = Command::cargo_bin("loci")
         .expect("loci binary exists")
@@ -612,6 +639,7 @@ fn review_success_moves_ticket_to_in_review() {
         ])
         .assert()
         .success();
+    add_trace(&home, &workspace);
 
     let output = Command::cargo_bin("loci")
         .expect("loci binary exists")
@@ -667,6 +695,7 @@ fn review_skip_validation_reason_allows_failing_validation() {
         ])
         .assert()
         .success();
+    add_trace(&home, &workspace);
 
     let output = Command::cargo_bin("loci")
         .expect("loci binary exists")

@@ -125,6 +125,65 @@ fn add_evidence(home: &TempDir, workspace: &TempDir, ticket_id: &str) -> Value {
     serde_json::from_slice(&output).expect("evidence add json")
 }
 
+fn add_validation_commands(workspace: &TempDir, commands: &[&str]) {
+    let body = commands
+        .iter()
+        .map(|command| format!("- [ ] {command}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let ticket_dir = workspace.path().join("loci/tickets/EXA-001");
+    std::fs::create_dir_all(&ticket_dir).expect("ticket dir");
+    std::fs::write(
+        ticket_dir.join("validation.md"),
+        format!("# EXA-001 Validation\n\n## Validation Commands\n\n{body}\n"),
+    )
+    .expect("validation commands");
+
+    let conn = Connection::open(project_db(workspace)).expect("open db");
+    conn.execute(
+        "UPDATE ticket SET validation_path = 'loci/tickets/EXA-001/validation.md' WHERE id = 'EXA-001'",
+        [],
+    )
+    .expect("update validation path");
+}
+
+fn mark_ticket_in_progress(workspace: &TempDir) {
+    let conn = Connection::open(project_db(workspace)).expect("open db");
+    conn.execute(
+        "UPDATE ticket SET status = 'in_progress' WHERE id = 'EXA-001'",
+        [],
+    )
+    .expect("mark ticket in progress");
+}
+
+fn add_summary(home: &TempDir, workspace: &TempDir) {
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "summary",
+            "EXA-001",
+            "--text",
+            "Implemented trace workflow.",
+            "--json",
+        ])
+        .assert()
+        .success();
+}
+
+fn add_validation_evidence_and_summary(home: &TempDir, workspace: &TempDir) {
+    add_validation_commands(workspace, &["/bin/echo validation-ok"]);
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["validate", "EXA-001", "--run", "--json"])
+        .assert()
+        .success();
+    add_summary(home, workspace);
+}
+
 #[test]
 fn trace_add_requires_meaningful_summary_and_actor() {
     let (home, workspace) = initialized_workspace();
@@ -492,4 +551,56 @@ fn trace_add_rejects_cross_ticket_evidence_link() {
         .assert()
         .failure()
         .stderr(contains("evidence EV-000001 does not belong to EXA-002"));
+}
+
+#[test]
+fn review_fails_when_trace_is_missing() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    mark_ticket_in_progress(&workspace);
+    add_validation_evidence_and_summary(&home, &workspace);
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["review", "EXA-001", "--json"])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("review json");
+    assert_eq!(value["ok"], false);
+    assert!(value["missing"]
+        .as_array()
+        .expect("missing")
+        .iter()
+        .any(|field| field["code"] == "trace.records"));
+}
+
+#[test]
+fn review_succeeds_after_adding_trace() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    mark_ticket_in_progress(&workspace);
+    add_validation_evidence_and_summary(&home, &workspace);
+    trace_add_json(&home, &workspace);
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["review", "EXA-001", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("review json");
+    assert_eq!(value["ok"], true);
+    assert_eq!(value["ready_for_review"], true);
+    assert_eq!(value["ticket"]["status"], "in_review");
 }

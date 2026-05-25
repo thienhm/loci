@@ -49,6 +49,7 @@ pub fn evaluate_review(
     ticket: &TicketRecord,
     summary: Option<&str>,
     evidence_count: usize,
+    trace_count: usize,
     skip_validation_reason: Option<&str>,
 ) -> Vec<MissingReadinessField> {
     let mut missing = Vec::new();
@@ -62,6 +63,13 @@ pub fn evaluate_review(
         missing.push(field(
             "evidence.records",
             "At least one evidence record is required.",
+        ));
+    }
+
+    if trace_count == 0 {
+        missing.push(field(
+            "trace.records",
+            "At least one trace record is required.",
         ));
     }
 
