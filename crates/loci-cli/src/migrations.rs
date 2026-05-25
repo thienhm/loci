@@ -90,6 +90,38 @@ CREATE TABLE IF NOT EXISTS validation_run (
     FOREIGN KEY(ticket_id) REFERENCES ticket(id),
     FOREIGN KEY(evidence_id) REFERENCES evidence(id)
 );
+
+CREATE TABLE IF NOT EXISTS trace (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK(event_type IN ('intake','plan','action','command','error','decision','validation','evidence','summary','review','handoff','note')),
+    task_summary TEXT NOT NULL,
+    intake TEXT,
+    actions_json TEXT NOT NULL DEFAULT '[]',
+    files_read_json TEXT NOT NULL DEFAULT '[]',
+    files_changed_json TEXT NOT NULL DEFAULT '[]',
+    commands_json TEXT NOT NULL DEFAULT '[]',
+    errors_json TEXT NOT NULL DEFAULT '[]',
+    decisions_json TEXT NOT NULL DEFAULT '[]',
+    outcome TEXT NOT NULL CHECK(outcome IN ('success','failure','partial','blocked','informational')),
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(ticket_id) REFERENCES ticket(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_trace_ticket_id ON trace(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_trace_actor ON trace(actor);
+CREATE INDEX IF NOT EXISTS idx_trace_event_type ON trace(event_type);
+CREATE INDEX IF NOT EXISTS idx_trace_created_at ON trace(created_at);
+
+CREATE TABLE IF NOT EXISTS trace_evidence (
+    trace_id TEXT NOT NULL,
+    evidence_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(trace_id, evidence_id),
+    FOREIGN KEY(trace_id) REFERENCES trace(id),
+    FOREIGN KEY(evidence_id) REFERENCES evidence(id)
+);
 "#];
 
 pub const REGISTRY_MIGRATIONS: &[&str] = &[r#"

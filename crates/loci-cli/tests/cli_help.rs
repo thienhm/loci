@@ -19,6 +19,7 @@ fn help_mentions_core_commands() {
         .stdout(contains("ready"))
         .stdout(contains("validate"))
         .stdout(contains("evidence"))
+        .stdout(contains("trace"))
         .stdout(contains("summary"))
         .stdout(contains("review"));
 }

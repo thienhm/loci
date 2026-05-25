@@ -9,4 +9,5 @@ pub mod ready;
 pub mod review;
 pub mod shape;
 pub mod summary;
+pub mod trace;
 pub mod validate;

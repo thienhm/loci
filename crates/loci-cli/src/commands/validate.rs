@@ -29,12 +29,18 @@ pub fn run(id: &str, should_run: bool, json: bool) -> Result<()> {
 
     if !should_run {
         let evidence_count = project::list_evidence_for_ticket(&conn, id)?.len();
+        let trace_count = project::trace_count_for_ticket(&conn, id)?;
         let summary_present = ticket
             .summary_path
             .as_deref()
             .map(|path| root.join(path).is_file())
             .unwrap_or(false);
-        let missing = inspection_missing(evidence_count, summary_present, &ticket.validation_state);
+        let missing = inspection_missing(
+            evidence_count,
+            trace_count,
+            summary_present,
+            &ticket.validation_state,
+        );
         let response = ValidationInspectionResponse {
             ok: true,
             ticket_id: id.to_string(),
@@ -214,6 +220,7 @@ fn read_optional(path: PathBuf) -> Result<Option<String>> {
 
 fn inspection_missing(
     evidence_count: usize,
+    trace_count: usize,
     summary_present: bool,
     validation_state: &str,
 ) -> Vec<MissingReadinessField> {
@@ -228,6 +235,12 @@ fn inspection_missing(
         missing.push(MissingReadinessField {
             code: "summary.doc".to_string(),
             message: "summary.md is required.".to_string(),
+        });
+    }
+    if trace_count == 0 {
+        missing.push(MissingReadinessField {
+            code: "trace.records".to_string(),
+            message: "At least one trace record is required.".to_string(),
         });
     }
     if validation_state != "passing" {
