@@ -11,6 +11,7 @@ pub mod readiness;
 pub mod registry;
 pub mod review;
 pub mod templates;
+pub mod trace;
 pub mod validation;
 
 pub use app::run;

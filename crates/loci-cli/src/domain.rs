@@ -67,6 +67,32 @@ pub struct EvidenceRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TraceRecord {
+    pub id: String,
+    pub ticket_id: String,
+    pub actor: String,
+    pub event_type: String,
+    pub task_summary: String,
+    pub intake: Option<String>,
+    pub actions: Vec<String>,
+    pub files_read: Vec<String>,
+    pub files_changed: Vec<String>,
+    pub commands: Vec<String>,
+    pub errors: Vec<String>,
+    pub decisions: Vec<String>,
+    pub outcome: String,
+    pub evidence_ids: Vec<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TraceListFilters {
+    pub ticket_id: Option<String>,
+    pub actor: Option<String>,
+    pub event_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TicketWithDocs {
     #[serde(flatten)]
     pub ticket: TicketRecord,

@@ -112,6 +112,12 @@ pub enum Commands {
         command: EvidenceCommands,
     },
 
+    /// Record and inspect operational traces.
+    Trace {
+        #[command(subcommand)]
+        command: TraceCommands,
+    },
+
     /// Write a review summary.
     Summary {
         /// Ticket id, for example LCI-001.
@@ -174,6 +180,99 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum TraceCommands {
+    /// Add an operational trace record.
+    Add(Box<TraceAddArgs>),
+
+    /// List operational trace records.
+    List {
+        /// Ticket id, for example LCI-001.
+        #[arg(long)]
+        ticket: Option<String>,
+
+        /// Trace actor, for example agent:codex.
+        #[arg(long)]
+        actor: Option<String>,
+
+        /// Trace event type.
+        #[arg(long = "type", value_enum)]
+        event_type: Option<TraceEventTypeArg>,
+
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show one operational trace record.
+    Show {
+        /// Trace id, for example TR-000001.
+        trace_id: String,
+
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Debug, Args)]
+pub struct TraceAddArgs {
+    /// Ticket id, for example LCI-001.
+    pub id: String,
+
+    /// Trace task summary.
+    #[arg(long)]
+    pub summary: String,
+
+    /// Trace actor, for example agent:codex.
+    #[arg(long)]
+    pub actor: String,
+
+    /// Trace event type.
+    #[arg(long = "type", value_enum, default_value = "action")]
+    pub event_type: TraceEventTypeArg,
+
+    /// Intake context.
+    #[arg(long)]
+    pub intake: Option<String>,
+
+    /// Action taken.
+    #[arg(long)]
+    pub action: Vec<String>,
+
+    /// File read while working.
+    #[arg(long = "file-read")]
+    pub file_read: Vec<String>,
+
+    /// File changed while working.
+    #[arg(long = "file-changed")]
+    pub file_changed: Vec<String>,
+
+    /// Command run while working.
+    #[arg(long)]
+    pub command: Vec<String>,
+
+    /// Error encountered while working.
+    #[arg(long)]
+    pub error: Vec<String>,
+
+    /// Decision made while working.
+    #[arg(long)]
+    pub decision: Vec<String>,
+
+    /// Trace outcome.
+    #[arg(long, value_enum, default_value = "informational")]
+    pub outcome: TraceOutcomeArg,
+
+    /// Evidence id linked to the trace.
+    #[arg(long)]
+    pub evidence: Vec<String>,
+
+    /// Emit machine-readable JSON.
+    #[arg(long)]
+    pub json: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -363,6 +462,62 @@ impl EvidenceOutcomeArg {
     }
 }
 
+#[derive(Clone, Debug, ValueEnum)]
+pub enum TraceEventTypeArg {
+    Intake,
+    Plan,
+    Action,
+    Command,
+    Error,
+    Decision,
+    Validation,
+    Evidence,
+    Summary,
+    Review,
+    Handoff,
+    Note,
+}
+
+impl TraceEventTypeArg {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Intake => "intake",
+            Self::Plan => "plan",
+            Self::Action => "action",
+            Self::Command => "command",
+            Self::Error => "error",
+            Self::Decision => "decision",
+            Self::Validation => "validation",
+            Self::Evidence => "evidence",
+            Self::Summary => "summary",
+            Self::Review => "review",
+            Self::Handoff => "handoff",
+            Self::Note => "note",
+        }
+    }
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+pub enum TraceOutcomeArg {
+    Success,
+    Failure,
+    Partial,
+    Blocked,
+    Informational,
+}
+
+impl TraceOutcomeArg {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Success => "success",
+            Self::Failure => "failure",
+            Self::Partial => "partial",
+            Self::Blocked => "blocked",
+            Self::Informational => "informational",
+        }
+    }
+}
+
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
@@ -420,6 +575,36 @@ pub fn run() -> Result<()> {
             EvidenceCommands::Show { evidence_id, json } => {
                 commands::evidence::show(&evidence_id, json)
             }
+        },
+        Commands::Trace { command } => match command {
+            TraceCommands::Add(input) => commands::trace::add(commands::trace::TraceAddInput {
+                id: input.id,
+                summary: input.summary,
+                actor: input.actor,
+                event_type: input.event_type,
+                intake: input.intake,
+                actions: input.action,
+                files_read: input.file_read,
+                files_changed: input.file_changed,
+                commands: input.command,
+                errors: input.error,
+                decisions: input.decision,
+                outcome: input.outcome,
+                evidence_ids: input.evidence,
+                json: input.json,
+            }),
+            TraceCommands::List {
+                ticket,
+                actor,
+                event_type,
+                json,
+            } => commands::trace::list(commands::trace::TraceListInput {
+                ticket,
+                actor,
+                event_type,
+                json,
+            }),
+            TraceCommands::Show { trace_id, json } => commands::trace::show(&trace_id, json),
         },
         Commands::Summary { id, text, json } => commands::summary::run(&id, &text, json),
         Commands::Review {
