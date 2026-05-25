@@ -99,6 +99,32 @@ fn trace_add_full_json(home: &TempDir, workspace: &TempDir) -> Value {
     serde_json::from_slice(&output).expect("full trace add json")
 }
 
+fn add_evidence(home: &TempDir, workspace: &TempDir, ticket_id: &str) -> Value {
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "evidence",
+            "add",
+            ticket_id,
+            "--type",
+            "note",
+            "--title",
+            "Manual check",
+            "--outcome",
+            "informational",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    serde_json::from_slice(&output).expect("evidence add json")
+}
+
 #[test]
 fn trace_add_requires_meaningful_summary_and_actor() {
     let (home, workspace) = initialized_workspace();
@@ -367,4 +393,103 @@ fn trace_show_returns_one_record_or_fails_when_missing() {
         .assert()
         .failure()
         .stderr(contains("trace TR-999999 not found"));
+}
+
+#[test]
+fn trace_add_links_same_ticket_evidence() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    let evidence = add_evidence(&home, &workspace, "EXA-001");
+    assert_eq!(evidence["id"], "EV-000001");
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "trace",
+            "add",
+            "EXA-001",
+            "--summary",
+            "Recorded proof",
+            "--actor",
+            "agent:codex",
+            "--evidence",
+            "EV-000001",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let trace: Value = serde_json::from_slice(&output).expect("trace add json");
+    assert_eq!(trace["evidence_ids"][0], "EV-000001");
+
+    let conn = Connection::open(project_db(&workspace)).expect("project db opens");
+    let link_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM trace_evidence", [], |row| row.get(0))
+        .expect("trace evidence count");
+    assert_eq!(link_count, 1);
+}
+
+#[test]
+fn trace_add_rejects_missing_evidence_link() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "trace",
+            "add",
+            "EXA-001",
+            "--summary",
+            "Recorded proof",
+            "--actor",
+            "agent:codex",
+            "--evidence",
+            "EV-999999",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("evidence EV-999999 not found"));
+}
+
+#[test]
+fn trace_add_rejects_cross_ticket_evidence_link() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["add", "Other packet", "--json"])
+        .assert()
+        .success();
+    let evidence = add_evidence(&home, &workspace, "EXA-001");
+    assert_eq!(evidence["id"], "EV-000001");
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "trace",
+            "add",
+            "EXA-002",
+            "--summary",
+            "Recorded proof",
+            "--actor",
+            "agent:codex",
+            "--evidence",
+            "EV-000001",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("evidence EV-000001 does not belong to EXA-002"));
 }

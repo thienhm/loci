@@ -46,6 +46,7 @@ pub fn add(input: TraceAddInput) -> Result<()> {
     let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
     project::get_ticket(&tx, &input.id)?
         .ok_or_else(|| anyhow::anyhow!("ticket {} does not exist", input.id))?;
+    validate_evidence_links(&tx, &input.id, &input.evidence_ids)?;
 
     let now = OffsetDateTime::now_utc().format(&Rfc3339)?;
     let record = TraceRecord {
@@ -106,6 +107,22 @@ pub fn add(input: TraceAddInput) -> Result<()> {
         println!("{}", serde_json::to_string(&record)?);
     } else {
         println!("Recorded {} for {}", record.id, record.ticket_id);
+    }
+
+    Ok(())
+}
+
+fn validate_evidence_links(
+    conn: &rusqlite::Connection,
+    ticket_id: &str,
+    evidence_ids: &[String],
+) -> Result<()> {
+    for evidence_id in evidence_ids {
+        let evidence = project::get_evidence(conn, evidence_id)?
+            .ok_or_else(|| anyhow!("evidence {evidence_id} not found"))?;
+        if evidence.ticket_id != ticket_id {
+            bail!("evidence {evidence_id} does not belong to {ticket_id}");
+        }
     }
 
     Ok(())
