@@ -709,6 +709,34 @@ pub fn get_decision(conn: &Connection, id: &str) -> Result<Option<DecisionRecord
     }
 }
 
+pub fn update_decision_verification(
+    conn: &Connection,
+    id: &str,
+    outcome: &str,
+    command: Option<&str>,
+    note: &str,
+    verified_at: &str,
+) -> Result<()> {
+    let updated = conn.execute(
+        r#"
+        UPDATE decision
+        SET verification_outcome = ?2,
+            verification_command = ?3,
+            verification_note = ?4,
+            verified_at = ?5,
+            updated_at = ?5
+        WHERE id = ?1
+        "#,
+        params![id, outcome, command, note, verified_at],
+    )?;
+
+    if updated == 0 {
+        bail!("decision {id} not found");
+    }
+
+    Ok(())
+}
+
 fn ticket_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TicketRecord> {
     let labels_json: String = row.get(5)?;
     let labels: Vec<String> = serde_json::from_str(&labels_json)

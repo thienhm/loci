@@ -136,8 +136,52 @@ pub fn show(decision_id: &str, json: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn verify(_input: DecisionVerifyInput) -> Result<()> {
-    println!("decision verify is not implemented yet");
+pub fn verify(input: DecisionVerifyInput) -> Result<()> {
+    decision::validate_required_text(&input.note, decision::EMPTY_VERIFY_NOTE_ERROR)?;
+
+    let cwd = std::env::current_dir()?;
+    let root = find_workspace_root(&cwd).ok_or_else(|| anyhow!("not inside a Loci workspace"))?;
+    let mut conn = connect_project_db(&root.join(".loci/loci.db"))?;
+    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let verified_at = OffsetDateTime::now_utc().format(&Rfc3339)?;
+
+    project::update_decision_verification(
+        &tx,
+        &input.decision_id,
+        input.outcome.as_str(),
+        input.command.as_deref(),
+        &input.note,
+        &verified_at,
+    )?;
+    let record = project::get_decision(&tx, &input.decision_id)?
+        .ok_or_else(|| anyhow!("decision {} not found", input.decision_id))?;
+
+    let decision_file = root.join(&record.doc_path);
+    let previous_decision = if decision_file.exists() {
+        Some(std::fs::read_to_string(&decision_file)?)
+    } else {
+        None
+    };
+    let existing = previous_decision
+        .as_deref()
+        .map(str::to_string)
+        .unwrap_or_else(|| templates::decision_record_md(&record.id, &record.title));
+    let updated = decision::render_decision_markdown(&existing, &record);
+    if let Some(parent) = decision_file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&decision_file, updated)?;
+
+    if let Err(error) = tx.commit() {
+        if let Some(previous) = previous_decision {
+            let _ = std::fs::write(&decision_file, previous);
+        } else {
+            let _ = std::fs::remove_file(&decision_file);
+        }
+        return Err(error.into());
+    }
+
+    print_record(&record, input.json)?;
     Ok(())
 }
 

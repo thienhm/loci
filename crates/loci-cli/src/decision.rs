@@ -85,6 +85,15 @@ fn render_generated_section(record: &DecisionRecord) -> String {
         "- Verification: `{}`\n",
         record.verification_outcome
     ));
+    if let Some(command) = &record.verification_command {
+        section.push_str(&format!("- Command: `{}`\n", command.trim()));
+    }
+    if let Some(note) = &record.verification_note {
+        section.push_str(&format!("- Note: {}\n", note.trim()));
+    }
+    if let Some(verified_at) = &record.verified_at {
+        section.push_str(&format!("- Verified At: `{}`\n", verified_at.trim()));
+    }
     push_list(&mut section, "Context", &record.context);
     push_list(&mut section, "Decision", &record.decision);
     push_list(&mut section, "Consequences", &record.consequences);

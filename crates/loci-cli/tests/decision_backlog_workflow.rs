@@ -68,6 +68,63 @@ fn add_trace(home: &TempDir, workspace: &TempDir) -> String {
     trace["id"].as_str().expect("trace id").to_string()
 }
 
+fn add_decision(
+    home: &TempDir,
+    workspace: &TempDir,
+    title: &str,
+    status: &str,
+    trace_id: &str,
+) -> Value {
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "decision",
+            "add",
+            "--title",
+            title,
+            "--status",
+            status,
+            "--decision",
+            "Use manual trace recording first.",
+            "--ticket",
+            "EXA-001",
+            "--trace",
+            trace_id,
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    serde_json::from_slice(&output).expect("decision add json")
+}
+
+fn assert_single_decision_filter(
+    home: &TempDir,
+    workspace: &TempDir,
+    args: &[&str],
+    expected_id: &str,
+) {
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(args)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let decisions: Value = serde_json::from_slice(&output).expect("decision list json");
+    let records = decisions.as_array().expect("decision array");
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["id"], expected_id);
+}
+
 #[test]
 fn decision_and_backlog_add_require_meaningful_titles() {
     let (home, workspace) = initialized_workspace();
@@ -211,4 +268,149 @@ fn decision_add_creates_sqlite_record_and_markdown() {
         .assert()
         .failure()
         .stderr(contains("decision DEC-999999 not found"));
+}
+
+#[test]
+fn decision_list_filters_by_ticket_trace_and_status() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    let trace_id = add_trace(&home, &workspace);
+    let decision = add_decision(
+        &home,
+        &workspace,
+        "Manual traces before automatic instrumentation",
+        "accepted",
+        &trace_id,
+    );
+    let decision_id = decision["id"].as_str().expect("decision id");
+
+    assert_single_decision_filter(
+        &home,
+        &workspace,
+        &["decision", "list", "--ticket", "EXA-001", "--json"],
+        decision_id,
+    );
+    assert_single_decision_filter(
+        &home,
+        &workspace,
+        &["decision", "list", "--trace", &trace_id, "--json"],
+        decision_id,
+    );
+    assert_single_decision_filter(
+        &home,
+        &workspace,
+        &["decision", "list", "--status", "accepted", "--json"],
+        decision_id,
+    );
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["decision", "list", "--status", "proposed", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let decisions: Value = serde_json::from_slice(&output).expect("decision list json");
+    assert!(decisions.as_array().expect("decision array").is_empty());
+}
+
+#[test]
+fn decision_verify_updates_record_and_markdown_preserving_human_notes() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    let trace_id = add_trace(&home, &workspace);
+    let decision = add_decision(
+        &home,
+        &workspace,
+        "Manual traces before automatic instrumentation",
+        "accepted",
+        &trace_id,
+    );
+    let doc_path = workspace
+        .path()
+        .join(decision["doc_path"].as_str().expect("decision doc path"));
+    let markdown = std::fs::read_to_string(&doc_path).expect("decision markdown");
+    std::fs::write(
+        &doc_path,
+        format!(
+            "{}\n## Human Notes\n\nThis context stays owned by people.\n",
+            markdown.trim_end()
+        ),
+    )
+    .expect("append human notes");
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "decision",
+            "verify",
+            "DEC-000001",
+            "--outcome",
+            "passing",
+            "--command",
+            "rtk cargo test -p loci-cli",
+            "--note",
+            "Still matches implemented behavior.",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let verified: Value = serde_json::from_slice(&output).expect("decision verify json");
+
+    assert_eq!(verified["verification_outcome"], "passing");
+    assert_eq!(
+        verified["verification_command"],
+        "rtk cargo test -p loci-cli"
+    );
+    assert_eq!(
+        verified["verification_note"],
+        "Still matches implemented behavior."
+    );
+    assert!(verified["verified_at"].as_str().expect("verified_at").len() > 10);
+
+    let markdown = std::fs::read_to_string(&doc_path).expect("verified decision markdown");
+    assert!(markdown.contains("- Verification: `passing`"));
+    assert!(markdown.contains("- Command: `rtk cargo test -p loci-cli`"));
+    assert!(markdown.contains("- Note: Still matches implemented behavior."));
+    assert!(markdown.contains("## Human Notes"));
+    assert!(markdown.contains("This context stays owned by people."));
+}
+
+#[test]
+fn decision_verify_requires_meaningful_note() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    let trace_id = add_trace(&home, &workspace);
+    add_decision(
+        &home,
+        &workspace,
+        "Manual traces before automatic instrumentation",
+        "accepted",
+        &trace_id,
+    );
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "decision",
+            "verify",
+            "DEC-000001",
+            "--outcome",
+            "passing",
+            "--note",
+            "",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("decision verification note cannot be empty"));
 }
