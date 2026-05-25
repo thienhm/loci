@@ -163,6 +163,10 @@ pub fn evidence_packet_md(id: &str) -> String {
     format!("# {id} Evidence\n")
 }
 
+pub fn trace_packet_md(id: &str) -> String {
+    format!("# {id} Trace\n")
+}
+
 pub fn summary_packet_md(id: &str) -> String {
     format!("# {id} Summary\n")
 }

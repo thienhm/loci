@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use rusqlite::TransactionBehavior;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
@@ -9,6 +9,7 @@ use crate::domain::TraceListFilters;
 use crate::domain::TraceRecord;
 use crate::paths::find_workspace_root;
 use crate::project;
+use crate::templates;
 use crate::trace;
 
 pub struct TraceAddInput {
@@ -67,7 +68,39 @@ pub fn add(input: TraceAddInput) -> Result<()> {
 
     project::insert_trace(&tx, &record)?;
     project::insert_trace_evidence_links(&tx, &record.id, &record.evidence_ids, &now)?;
-    tx.commit()?;
+    let records = project::list_traces(
+        &tx,
+        &TraceListFilters {
+            ticket_id: Some(record.ticket_id.clone()),
+            actor: None,
+            event_type: None,
+        },
+    )?;
+
+    let trace_file = crate::packet::ticket_dir(&root, &record.ticket_id).join("trace.md");
+    let previous_trace = if trace_file.exists() {
+        Some(std::fs::read_to_string(&trace_file)?)
+    } else {
+        None
+    };
+    let existing = previous_trace
+        .as_deref()
+        .map(str::to_string)
+        .unwrap_or_else(|| templates::trace_packet_md(&record.ticket_id));
+    let updated = trace::render_trace_markdown(&existing, &records);
+    if let Some(parent) = trace_file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&trace_file, updated)?;
+
+    if let Err(error) = tx.commit() {
+        if let Some(previous) = previous_trace {
+            let _ = std::fs::write(&trace_file, previous);
+        } else {
+            let _ = std::fs::remove_file(&trace_file);
+        }
+        return Err(error.into());
+    }
 
     if input.json {
         println!("{}", serde_json::to_string(&record)?);
@@ -79,20 +112,59 @@ pub fn add(input: TraceAddInput) -> Result<()> {
 }
 
 pub fn list(input: TraceListInput) -> Result<()> {
-    let _filters = TraceListFilters {
+    let cwd = std::env::current_dir()?;
+    let root = find_workspace_root(&cwd).ok_or_else(|| anyhow!("not inside a Loci workspace"))?;
+    let conn = connect_project_db(&root.join(".loci/loci.db"))?;
+    let filters = TraceListFilters {
         ticket_id: input.ticket,
         actor: input.actor,
         event_type: input
             .event_type
             .map(|event_type| event_type.as_str().to_string()),
     };
-    let _ = input.json;
+    let records = project::list_traces(&conn, &filters)?;
 
-    bail!("trace list is not implemented yet")
+    if input.json {
+        println!("{}", serde_json::to_string(&records)?);
+    } else if records.is_empty() {
+        println!("No trace records");
+    } else {
+        for record in records {
+            println!(
+                "{} [{}] {} {} - {} - {}",
+                record.id,
+                record.event_type,
+                record.ticket_id,
+                record.actor,
+                record.outcome,
+                record.task_summary
+            );
+        }
+    }
+
+    Ok(())
 }
 
 pub fn show(trace_id: &str, json: bool) -> Result<()> {
-    let _ = (trace_id, json);
+    let cwd = std::env::current_dir()?;
+    let root = find_workspace_root(&cwd).ok_or_else(|| anyhow!("not inside a Loci workspace"))?;
+    let conn = connect_project_db(&root.join(".loci/loci.db"))?;
+    let record =
+        project::get_trace(&conn, trace_id)?.ok_or_else(|| anyhow!("trace {trace_id} not found"))?;
 
-    bail!("trace show is not implemented yet")
+    if json {
+        println!("{}", serde_json::to_string(&record)?);
+    } else {
+        println!(
+            "{} [{}] {} {} - {} - {}",
+            record.id,
+            record.event_type,
+            record.ticket_id,
+            record.actor,
+            record.outcome,
+            record.task_summary
+        );
+    }
+
+    Ok(())
 }

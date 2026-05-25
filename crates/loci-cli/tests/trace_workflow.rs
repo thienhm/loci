@@ -57,6 +57,48 @@ fn trace_add_json(home: &TempDir, workspace: &TempDir) -> Value {
     serde_json::from_slice(&output).expect("trace add json")
 }
 
+fn trace_add_full_json(home: &TempDir, workspace: &TempDir) -> Value {
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args([
+            "trace",
+            "add",
+            "EXA-001",
+            "--summary",
+            "Implemented validation parser",
+            "--actor",
+            "agent:codex",
+            "--type",
+            "decision",
+            "--intake",
+            "spec_slice",
+            "--action",
+            "Read validation workflow tests",
+            "--file-read",
+            "crates/loci-cli/src/app.rs",
+            "--file-changed",
+            "crates/loci-cli/src/app.rs",
+            "--command",
+            "rtk cargo test -p loci-cli --test trace_workflow",
+            "--error",
+            "Initial trace list test failed",
+            "--decision",
+            "Manual traces first",
+            "--outcome",
+            "partial",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    serde_json::from_slice(&output).expect("full trace add json")
+}
+
 #[test]
 fn trace_add_requires_meaningful_summary_and_actor() {
     let (home, workspace) = initialized_workspace();
@@ -196,4 +238,133 @@ fn trace_add_without_evidence_leaves_trace_evidence_empty() {
         .expect("trace evidence count");
 
     assert_eq!(link_count, 0);
+}
+
+#[test]
+fn trace_add_full_shape_writes_trace_markdown() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+
+    let trace = trace_add_full_json(&home, &workspace);
+
+    assert_eq!(trace["id"], "TR-000001");
+    assert_eq!(trace["event_type"], "decision");
+    assert_eq!(trace["intake"], "spec_slice");
+    assert_eq!(trace["actions"][0], "Read validation workflow tests");
+    assert_eq!(trace["files_read"][0], "crates/loci-cli/src/app.rs");
+    assert_eq!(trace["files_changed"][0], "crates/loci-cli/src/app.rs");
+    assert_eq!(
+        trace["commands"][0],
+        "rtk cargo test -p loci-cli --test trace_workflow"
+    );
+    assert_eq!(trace["errors"][0], "Initial trace list test failed");
+    assert_eq!(trace["decisions"][0], "Manual traces first");
+    assert_eq!(trace["outcome"], "partial");
+
+    let trace_path = workspace.path().join("loci/tickets/EXA-001/trace.md");
+    let trace_md = std::fs::read_to_string(trace_path).expect("trace markdown");
+    assert!(trace_md.contains("<!-- LOCI:TRACE:BEGIN -->"));
+    assert!(trace_md.contains("- `TR-000001` [decision] agent:codex - partial - Implemented validation parser"));
+    assert!(trace_md.contains("Files read: `crates/loci-cli/src/app.rs`"));
+    assert!(trace_md.contains("Files changed: `crates/loci-cli/src/app.rs`"));
+    assert!(trace_md.contains("Commands: `rtk cargo test -p loci-cli --test trace_workflow`"));
+}
+
+#[test]
+fn trace_markdown_preserves_human_notes_on_rerender() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    let trace_path = workspace.path().join("loci/tickets/EXA-001/trace.md");
+    std::fs::write(
+        &trace_path,
+        "# EXA-001 Trace\n\n## Human Notes\n\nKeep this trace context.\n",
+    )
+    .expect("seed trace markdown");
+
+    trace_add_json(&home, &workspace);
+    trace_add_full_json(&home, &workspace);
+
+    let trace_md = std::fs::read_to_string(trace_path).expect("trace markdown");
+    assert!(trace_md.contains("## Human Notes\n\nKeep this trace context."));
+    assert_eq!(trace_md.matches("<!-- LOCI:TRACE:BEGIN -->").count(), 1);
+    assert!(trace_md.contains("Read ticket context"));
+    assert!(trace_md.contains("Implemented validation parser"));
+}
+
+#[test]
+fn trace_list_filters_by_ticket_actor_and_type() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    trace_add_json(&home, &workspace);
+    trace_add_full_json(&home, &workspace);
+
+    let by_ticket = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["trace", "list", "--ticket", "EXA-001", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let traces: Value = serde_json::from_slice(&by_ticket).expect("trace list json");
+    assert_eq!(traces.as_array().expect("trace array").len(), 2);
+
+    let by_actor = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["trace", "list", "--actor", "agent:codex", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let traces: Value = serde_json::from_slice(&by_actor).expect("trace list by actor");
+    assert_eq!(traces.as_array().expect("trace array").len(), 2);
+
+    let by_type = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["trace", "list", "--type", "decision", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let traces: Value = serde_json::from_slice(&by_type).expect("trace list by type");
+    assert_eq!(traces.as_array().expect("trace array").len(), 1);
+    assert_eq!(traces[0]["id"], "TR-000002");
+}
+
+#[test]
+fn trace_show_returns_one_record_or_fails_when_missing() {
+    let (home, workspace) = initialized_workspace();
+    add_packet(&home, &workspace);
+    trace_add_json(&home, &workspace);
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["trace", "show", "TR-000001", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let trace: Value = serde_json::from_slice(&output).expect("trace show json");
+    assert_eq!(trace["id"], "TR-000001");
+    assert_eq!(trace["task_summary"], "Read ticket context");
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["trace", "show", "TR-999999", "--json"])
+        .assert()
+        .failure()
+        .stderr(contains("trace TR-999999 not found"));
 }
