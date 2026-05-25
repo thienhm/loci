@@ -59,6 +59,37 @@ CREATE TABLE IF NOT EXISTS template_pack (
     version TEXT NOT NULL,
     applied_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS evidence (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL,
+    evidence_type TEXT NOT NULL CHECK(evidence_type IN ('command','screenshot','log','manual_check','test_report','link','note')),
+    layer TEXT CHECK(layer IN ('unit','integration','e2e','ui','accessibility','performance','security','logs_audit','manual','release')),
+    title TEXT NOT NULL,
+    summary TEXT,
+    command TEXT,
+    artifact_path TEXT,
+    url TEXT,
+    note TEXT,
+    exit_code INTEGER,
+    outcome TEXT NOT NULL CHECK(outcome IN ('passing','failing','partial','skipped','informational')),
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(ticket_id) REFERENCES ticket(id)
+);
+
+CREATE TABLE IF NOT EXISTS validation_run (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL,
+    command TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('passing','failing')),
+    exit_code INTEGER,
+    evidence_id TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(ticket_id) REFERENCES ticket(id),
+    FOREIGN KEY(evidence_id) REFERENCES evidence(id)
+);
 "#];
 
 pub const REGISTRY_MIGRATIONS: &[&str] = &[r#"
