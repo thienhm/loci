@@ -167,6 +167,10 @@ pub fn trace_packet_md(id: &str) -> String {
     format!("# {id} Trace\n")
 }
 
+pub fn decision_record_md(id: &str, title: &str) -> String {
+    format!("# {id} {title}\n")
+}
+
 pub fn summary_packet_md(id: &str) -> String {
     format!("# {id} Summary\n")
 }
