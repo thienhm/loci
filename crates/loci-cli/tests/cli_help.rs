@@ -12,7 +12,11 @@ fn help_mentions_core_commands() {
         .stdout(contains("init"))
         .stdout(contains("doctor"))
         .stdout(contains("list"))
-        .stdout(contains("get"));
+        .stdout(contains("get"))
+        .stdout(contains("add"))
+        .stdout(contains("shape"))
+        .stdout(contains("plan"))
+        .stdout(contains("ready"));
 }
 
 #[test]

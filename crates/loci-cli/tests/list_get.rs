@@ -89,6 +89,49 @@ fn get_json_returns_ticket_and_docs() {
 }
 
 #[test]
+fn get_json_returns_workflow_packet_docs() {
+    let (home, workspace) = initialized_workspace();
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["add", "Workflow packet", "--json"])
+        .assert()
+        .success();
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["plan", "EXA-001", "--step", "Write tests.", "--json"])
+        .assert()
+        .success();
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["get", "EXA-001", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json get output");
+    assert_eq!(value["id"], "EXA-001");
+    assert!(value["docs"]["story.md"]
+        .as_str()
+        .unwrap()
+        .contains("Workflow packet"));
+    assert!(value["docs"]["plan.md"]
+        .as_str()
+        .unwrap()
+        .contains("- [ ] Write tests."));
+}
+
+#[test]
 fn list_human_output_mentions_empty_workspace() {
     let (home, workspace) = initialized_workspace();
 

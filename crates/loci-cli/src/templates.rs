@@ -113,3 +113,56 @@ pub fn glossary_md() -> &'static str {
 pub fn backlog_md() -> &'static str {
     "# Harness Backlog\n\nCapture missing docs, validation gaps, and repeated agent friction.\n"
 }
+
+pub fn story_packet_md(id: &str, title: &str) -> String {
+    format!(
+        r#"# {id} {title}
+
+## Intent
+
+Describe the outcome this workflow packet should produce.
+
+## Scope
+
+- TBD
+
+## Out of Scope
+
+- TBD
+
+## Context Links
+
+- TBD
+
+## Acceptance Criteria
+
+- TBD
+
+## Risk Lane
+
+normal
+"#
+    )
+}
+
+pub fn validation_packet_md(id: &str, requirements: &[String]) -> String {
+    format!(
+        "# {id} Validation\n\n## Validation Requirements\n\n{}\n",
+        checklist(requirements)
+    )
+}
+
+pub fn plan_packet_md(id: &str, steps: &[String]) -> String {
+    format!(
+        "# {id} Plan\n\n## Implementation Steps\n\n{}\n",
+        checklist(steps)
+    )
+}
+
+pub fn checklist(items: &[String]) -> String {
+    items
+        .iter()
+        .map(|item| format!("- [ ] {}", item.trim()))
+        .collect::<Vec<_>>()
+        .join("\n")
+}

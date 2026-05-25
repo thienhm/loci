@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProjectRecord {
@@ -52,7 +53,34 @@ pub struct TicketRecord {
 pub struct TicketWithDocs {
     #[serde(flatten)]
     pub ticket: TicketRecord,
-    pub docs: std::collections::BTreeMap<String, String>,
+    pub docs: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WorkflowCommandResponse {
+    pub ok: bool,
+    pub ticket: TicketRecord,
+    pub docs: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MissingReadinessField {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReadinessReport {
+    pub ready: bool,
+    pub missing: Vec<MissingReadinessField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReadyCommandResponse {
+    pub ok: bool,
+    pub ready: bool,
+    pub ticket: TicketRecord,
+    pub missing: Vec<MissingReadinessField>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
