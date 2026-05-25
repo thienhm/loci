@@ -301,14 +301,17 @@ fn trace_add_stores_empty_repeated_fields_as_json_arrays() {
         )
         .expect("trace row");
 
-    assert_eq!(row, (
-        "[]".to_string(),
-        "[]".to_string(),
-        "[]".to_string(),
-        "[]".to_string(),
-        "[]".to_string(),
-        "[]".to_string(),
-    ));
+    assert_eq!(
+        row,
+        (
+            "[]".to_string(),
+            "[]".to_string(),
+            "[]".to_string(),
+            "[]".to_string(),
+            "[]".to_string(),
+            "[]".to_string(),
+        )
+    );
 }
 
 #[test]
@@ -349,7 +352,9 @@ fn trace_add_full_shape_writes_trace_markdown() {
     let trace_path = workspace.path().join("loci/tickets/EXA-001/trace.md");
     let trace_md = std::fs::read_to_string(trace_path).expect("trace markdown");
     assert!(trace_md.contains("<!-- LOCI:TRACE:BEGIN -->"));
-    assert!(trace_md.contains("- `TR-000001` [decision] agent:codex - partial - Implemented validation parser"));
+    assert!(trace_md.contains(
+        "- `TR-000001` [decision] agent:codex - partial - Implemented validation parser"
+    ));
     assert!(trace_md.contains("Files read: `crates/loci-cli/src/app.rs`"));
     assert!(trace_md.contains("Files changed: `crates/loci-cli/src/app.rs`"));
     assert!(trace_md.contains("Commands: `rtk cargo test -p loci-cli --test trace_workflow`"));

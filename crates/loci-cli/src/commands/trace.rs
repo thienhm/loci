@@ -41,7 +41,8 @@ pub fn add(input: TraceAddInput) -> Result<()> {
     trace::validate_required_text(&input.actor, trace::EMPTY_ACTOR_ERROR)?;
 
     let cwd = std::env::current_dir()?;
-    let root = find_workspace_root(&cwd).ok_or_else(|| anyhow::anyhow!("not inside a Loci workspace"))?;
+    let root =
+        find_workspace_root(&cwd).ok_or_else(|| anyhow::anyhow!("not inside a Loci workspace"))?;
     let mut conn = connect_project_db(&root.join(".loci/loci.db"))?;
     let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
     project::get_ticket(&tx, &input.id)?
@@ -166,8 +167,8 @@ pub fn show(trace_id: &str, json: bool) -> Result<()> {
     let cwd = std::env::current_dir()?;
     let root = find_workspace_root(&cwd).ok_or_else(|| anyhow!("not inside a Loci workspace"))?;
     let conn = connect_project_db(&root.join(".loci/loci.db"))?;
-    let record =
-        project::get_trace(&conn, trace_id)?.ok_or_else(|| anyhow!("trace {trace_id} not found"))?;
+    let record = project::get_trace(&conn, trace_id)?
+        .ok_or_else(|| anyhow!("trace {trace_id} not found"))?;
 
     if json {
         println!("{}", serde_json::to_string(&record)?);

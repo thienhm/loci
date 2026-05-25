@@ -5,8 +5,7 @@ use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
 use crate::domain::{
-    EvidenceRecord, ProjectRecord, TicketRecord, TraceListFilters, TraceRecord,
-    ValidationRunRecord,
+    EvidenceRecord, ProjectRecord, TicketRecord, TraceListFilters, TraceRecord, ValidationRunRecord,
 };
 
 pub fn insert_project(conn: &Connection, project: &ProjectRecord) -> Result<()> {
