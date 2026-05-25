@@ -50,6 +50,23 @@ pub struct TicketRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EvidenceRecord {
+    pub id: String,
+    pub ticket_id: String,
+    pub evidence_type: String,
+    pub layer: Option<String>,
+    pub title: String,
+    pub summary: Option<String>,
+    pub command: Option<String>,
+    pub artifact_path: Option<String>,
+    pub url: Option<String>,
+    pub note: Option<String>,
+    pub exit_code: Option<i64>,
+    pub outcome: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TicketWithDocs {
     #[serde(flatten)]
     pub ticket: TicketRecord,
@@ -79,6 +96,62 @@ pub struct ReadinessReport {
 pub struct ReadyCommandResponse {
     pub ok: bool,
     pub ready: bool,
+    pub ticket: TicketRecord,
+    pub missing: Vec<MissingReadinessField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ValidationInspectionResponse {
+    pub ok: bool,
+    pub ticket_id: String,
+    pub validation_state: String,
+    pub review_state: String,
+    pub declared_commands: Vec<String>,
+    pub evidence_count: usize,
+    pub summary_present: bool,
+    pub ready_for_review: bool,
+    pub missing: Vec<MissingReadinessField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ValidationCommandResult {
+    pub command: String,
+    pub status: String,
+    pub exit_code: Option<i32>,
+    pub evidence_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ValidationRunRecord {
+    pub id: String,
+    pub ticket_id: String,
+    pub command: String,
+    pub status: String,
+    pub exit_code: Option<i32>,
+    pub evidence_id: String,
+    pub started_at: String,
+    pub finished_at: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ValidationRunResponse {
+    pub ok: bool,
+    pub ticket_id: String,
+    pub validation_state: String,
+    pub results: Vec<ValidationCommandResult>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SummaryCommandResponse {
+    pub ok: bool,
+    pub ticket: TicketRecord,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReviewCommandResponse {
+    pub ok: bool,
+    pub ready_for_review: bool,
     pub ticket: TicketRecord,
     pub missing: Vec<MissingReadinessField>,
 }

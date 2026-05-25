@@ -159,6 +159,14 @@ pub fn plan_packet_md(id: &str, steps: &[String]) -> String {
     )
 }
 
+pub fn evidence_packet_md(id: &str) -> String {
+    format!("# {id} Evidence\n")
+}
+
+pub fn summary_packet_md(id: &str) -> String {
+    format!("# {id} Summary\n")
+}
+
 pub fn checklist(items: &[String]) -> String {
     items
         .iter()

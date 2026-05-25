@@ -105,6 +105,48 @@ pub fn has_checkable_step(markdown: &str) -> bool {
     })
 }
 
+pub fn open_checklist_items_in_section(markdown: &str, heading: &str) -> Vec<String> {
+    let marker = format!("## {heading}");
+    let mut items = Vec::new();
+    let mut in_section = false;
+    let mut in_fence = false;
+
+    for line in markdown.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+            continue;
+        }
+
+        if in_fence {
+            continue;
+        }
+
+        if trimmed.starts_with('#') {
+            in_section = trimmed.starts_with("## ") && trimmed == marker;
+            continue;
+        }
+
+        if !in_section {
+            continue;
+        }
+
+        let Some(command) = trimmed.strip_prefix("- [ ]") else {
+            continue;
+        };
+        let command = command.trim();
+
+        if command.ends_with('\\') || !has_meaningful_content(command) {
+            continue;
+        }
+
+        items.push(command.to_string());
+    }
+
+    items
+}
+
 fn strip_html_comments(input: &str) -> String {
     let mut output = String::with_capacity(input.len());
     let mut rest = input;
