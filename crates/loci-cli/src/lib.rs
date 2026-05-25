@@ -1,6 +1,8 @@
 pub mod app;
+pub mod backlog;
 pub mod commands;
 pub mod db;
+pub mod decision;
 pub mod domain;
 pub mod evidence;
 pub mod migrations;

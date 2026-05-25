@@ -20,6 +20,8 @@ fn help_mentions_core_commands() {
         .stdout(contains("validate"))
         .stdout(contains("evidence"))
         .stdout(contains("trace"))
+        .stdout(contains("decision"))
+        .stdout(contains("backlog"))
         .stdout(contains("summary"))
         .stdout(contains("review"));
 }

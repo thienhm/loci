@@ -118,6 +118,18 @@ pub enum Commands {
         command: TraceCommands,
     },
 
+    /// Record and inspect project decisions.
+    Decision {
+        #[command(subcommand)]
+        command: DecisionCommands,
+    },
+
+    /// Record and inspect harness backlog items.
+    Backlog {
+        #[command(subcommand)]
+        command: BacklogCommands,
+    },
+
     /// Write a review summary.
     Summary {
         /// Ticket id, for example LCI-001.
@@ -269,6 +281,204 @@ pub struct TraceAddArgs {
     /// Evidence id linked to the trace.
     #[arg(long)]
     pub evidence: Vec<String>,
+
+    /// Emit machine-readable JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DecisionCommands {
+    /// Add a project decision record.
+    Add(Box<DecisionAddArgs>),
+
+    /// List project decision records.
+    List {
+        /// Ticket id, for example LCI-001.
+        #[arg(long)]
+        ticket: Option<String>,
+
+        /// Trace id, for example TR-000001.
+        #[arg(long)]
+        trace: Option<String>,
+
+        /// Decision status.
+        #[arg(long, value_enum)]
+        status: Option<DecisionStatusArg>,
+
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show one project decision record.
+    Show {
+        /// Decision id, for example DEC-000001.
+        decision_id: String,
+
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Verify a project decision record.
+    Verify(Box<DecisionVerifyArgs>),
+}
+
+#[derive(Debug, Args)]
+pub struct DecisionAddArgs {
+    /// Decision title.
+    #[arg(long)]
+    pub title: String,
+
+    /// Decision status.
+    #[arg(long, value_enum, default_value = "accepted")]
+    pub status: DecisionStatusArg,
+
+    /// Decision context.
+    #[arg(long)]
+    pub context: Vec<String>,
+
+    /// Decision text.
+    #[arg(long)]
+    pub decision: Vec<String>,
+
+    /// Decision consequence.
+    #[arg(long)]
+    pub consequence: Vec<String>,
+
+    /// Linked ticket id.
+    #[arg(long)]
+    pub ticket: Vec<String>,
+
+    /// Linked trace id.
+    #[arg(long)]
+    pub trace: Vec<String>,
+
+    /// Linked document path.
+    #[arg(long)]
+    pub doc: Vec<String>,
+
+    /// Emit machine-readable JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct DecisionVerifyArgs {
+    /// Decision id, for example DEC-000001.
+    pub decision_id: String,
+
+    /// Verification outcome.
+    #[arg(long, value_enum)]
+    pub outcome: DecisionVerificationOutcomeArg,
+
+    /// Verification command.
+    #[arg(long)]
+    pub command: Option<String>,
+
+    /// Verification note.
+    #[arg(long)]
+    pub note: String,
+
+    /// Emit machine-readable JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum BacklogCommands {
+    /// Add a harness backlog item.
+    Add(Box<BacklogAddArgs>),
+
+    /// List harness backlog items.
+    List {
+        /// Backlog status.
+        #[arg(long, value_enum)]
+        status: Option<BacklogStatusArg>,
+
+        /// Backlog kind.
+        #[arg(long, value_enum)]
+        kind: Option<BacklogKindArg>,
+
+        /// Ticket id, for example LCI-001.
+        #[arg(long)]
+        ticket: Option<String>,
+
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show one harness backlog item.
+    Show {
+        /// Backlog item id, for example HB-000001.
+        backlog_id: String,
+
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Update a harness backlog item status.
+    Status(Box<BacklogStatusArgs>),
+}
+
+#[derive(Debug, Args)]
+pub struct BacklogAddArgs {
+    /// Backlog item title.
+    #[arg(long)]
+    pub title: String,
+
+    /// Backlog item kind.
+    #[arg(long, value_enum)]
+    pub kind: BacklogKindArg,
+
+    /// Backlog item status.
+    #[arg(long, value_enum, default_value = "open")]
+    pub status: BacklogStatusArg,
+
+    /// Backlog source.
+    #[arg(long)]
+    pub source: Vec<String>,
+
+    /// Backlog impact.
+    #[arg(long)]
+    pub impact: Vec<String>,
+
+    /// Backlog recommendation.
+    #[arg(long)]
+    pub recommendation: Vec<String>,
+
+    /// Linked ticket id.
+    #[arg(long)]
+    pub ticket: Vec<String>,
+
+    /// Linked trace id.
+    #[arg(long)]
+    pub trace: Vec<String>,
+
+    /// Linked document path.
+    #[arg(long)]
+    pub doc: Vec<String>,
+
+    /// Emit machine-readable JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct BacklogStatusArgs {
+    /// Backlog item id, for example HB-000001.
+    pub backlog_id: String,
+
+    /// New backlog status.
+    #[arg(value_enum)]
+    pub status: BacklogStatusArg,
+
+    /// Status note.
+    #[arg(long)]
+    pub note: Option<String>,
 
     /// Emit machine-readable JSON.
     #[arg(long)]
@@ -463,6 +673,86 @@ impl EvidenceOutcomeArg {
 }
 
 #[derive(Clone, Debug, ValueEnum)]
+pub enum DecisionStatusArg {
+    Proposed,
+    Accepted,
+    Superseded,
+}
+
+impl DecisionStatusArg {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Proposed => "proposed",
+            Self::Accepted => "accepted",
+            Self::Superseded => "superseded",
+        }
+    }
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+pub enum DecisionVerificationOutcomeArg {
+    Passing,
+    Failing,
+    Skipped,
+}
+
+impl DecisionVerificationOutcomeArg {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Passing => "passing",
+            Self::Failing => "failing",
+            Self::Skipped => "skipped",
+        }
+    }
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+pub enum BacklogKindArg {
+    #[value(name = "missing-doc", alias = "missing_doc")]
+    MissingDoc,
+    #[value(name = "stale-validation", alias = "stale_validation")]
+    StaleValidation,
+    #[value(name = "agent-friction", alias = "agent_friction")]
+    AgentFriction,
+    #[value(name = "design-gap", alias = "design_gap")]
+    DesignGap,
+    #[value(name = "ownership-gap", alias = "ownership_gap")]
+    OwnershipGap,
+    #[value(name = "architecture-gap", alias = "architecture_gap")]
+    ArchitectureGap,
+}
+
+impl BacklogKindArg {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::MissingDoc => "missing_doc",
+            Self::StaleValidation => "stale_validation",
+            Self::AgentFriction => "agent_friction",
+            Self::DesignGap => "design_gap",
+            Self::OwnershipGap => "ownership_gap",
+            Self::ArchitectureGap => "architecture_gap",
+        }
+    }
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+pub enum BacklogStatusArg {
+    Open,
+    Accepted,
+    Resolved,
+}
+
+impl BacklogStatusArg {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Open => "open",
+            Self::Accepted => "accepted",
+            Self::Resolved => "resolved",
+        }
+    }
+}
+
+#[derive(Clone, Debug, ValueEnum)]
 pub enum TraceEventTypeArg {
     Intake,
     Plan,
@@ -605,6 +895,82 @@ pub fn run() -> Result<()> {
                 json,
             }),
             TraceCommands::Show { trace_id, json } => commands::trace::show(&trace_id, json),
+        },
+        Commands::Decision { command } => match command {
+            DecisionCommands::Add(input) => {
+                commands::decision::add(commands::decision::DecisionAddInput {
+                    title: input.title,
+                    status: input.status,
+                    context: input.context,
+                    decisions: input.decision,
+                    consequences: input.consequence,
+                    ticket_ids: input.ticket,
+                    trace_ids: input.trace,
+                    doc_paths: input.doc,
+                    json: input.json,
+                })
+            }
+            DecisionCommands::List {
+                ticket,
+                trace,
+                status,
+                json,
+            } => commands::decision::list(commands::decision::DecisionListInput {
+                ticket_id: ticket,
+                trace_id: trace,
+                status,
+                json,
+            }),
+            DecisionCommands::Show { decision_id, json } => {
+                commands::decision::show(&decision_id, json)
+            }
+            DecisionCommands::Verify(input) => {
+                commands::decision::verify(commands::decision::DecisionVerifyInput {
+                    decision_id: input.decision_id,
+                    outcome: input.outcome,
+                    command: input.command,
+                    note: input.note,
+                    json: input.json,
+                })
+            }
+        },
+        Commands::Backlog { command } => match command {
+            BacklogCommands::Add(input) => {
+                commands::backlog::add(commands::backlog::BacklogAddInput {
+                    title: input.title,
+                    kind: input.kind,
+                    status: input.status,
+                    sources: input.source,
+                    impact: input.impact,
+                    recommendations: input.recommendation,
+                    ticket_ids: input.ticket,
+                    trace_ids: input.trace,
+                    doc_paths: input.doc,
+                    json: input.json,
+                })
+            }
+            BacklogCommands::List {
+                status,
+                kind,
+                ticket,
+                json,
+            } => commands::backlog::list(commands::backlog::BacklogListInput {
+                status,
+                kind,
+                ticket_id: ticket,
+                json,
+            }),
+            BacklogCommands::Show { backlog_id, json } => {
+                commands::backlog::show(&backlog_id, json)
+            }
+            BacklogCommands::Status(input) => {
+                commands::backlog::status(commands::backlog::BacklogStatusInput {
+                    backlog_id: input.backlog_id,
+                    status: input.status,
+                    note: input.note,
+                    json: input.json,
+                })
+            }
         },
         Commands::Summary { id, text, json } => commands::summary::run(&id, &text, json),
         Commands::Review {

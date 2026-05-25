@@ -1,4 +1,6 @@
 pub mod add;
+pub mod backlog;
+pub mod decision;
 pub mod doctor;
 pub mod evidence;
 pub mod get;
