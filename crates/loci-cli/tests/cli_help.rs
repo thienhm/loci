@@ -23,7 +23,8 @@ fn help_mentions_core_commands() {
         .stdout(contains("decision"))
         .stdout(contains("backlog"))
         .stdout(contains("summary"))
-        .stdout(contains("review"));
+        .stdout(contains("review"))
+        .stdout(contains("upgrade"));
 }
 
 #[test]
