@@ -93,6 +93,58 @@ pub struct TraceListFilters {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DecisionRecord {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    pub context: Vec<String>,
+    pub decision: Vec<String>,
+    pub consequences: Vec<String>,
+    pub ticket_ids: Vec<String>,
+    pub trace_ids: Vec<String>,
+    pub doc_paths: Vec<String>,
+    pub doc_path: String,
+    pub verification_outcome: String,
+    pub verification_command: Option<String>,
+    pub verification_note: Option<String>,
+    pub verified_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DecisionListFilters {
+    pub ticket_id: Option<String>,
+    pub trace_id: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BacklogRecord {
+    pub id: String,
+    pub title: String,
+    pub kind: String,
+    pub status: String,
+    pub sources: Vec<String>,
+    pub impact: Vec<String>,
+    pub recommendations: Vec<String>,
+    pub ticket_ids: Vec<String>,
+    pub trace_ids: Vec<String>,
+    pub doc_paths: Vec<String>,
+    pub resolution_note: Option<String>,
+    pub resolved_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BacklogListFilters {
+    pub status: Option<String>,
+    pub kind: Option<String>,
+    pub ticket_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TicketWithDocs {
     #[serde(flatten)]
     pub ticket: TicketRecord,

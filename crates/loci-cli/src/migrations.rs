@@ -122,6 +122,49 @@ CREATE TABLE IF NOT EXISTS trace_evidence (
     FOREIGN KEY(trace_id) REFERENCES trace(id),
     FOREIGN KEY(evidence_id) REFERENCES evidence(id)
 );
+
+CREATE TABLE IF NOT EXISTS decision (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('proposed','accepted','superseded')),
+    context_json TEXT NOT NULL DEFAULT '[]',
+    decision_json TEXT NOT NULL DEFAULT '[]',
+    consequences_json TEXT NOT NULL DEFAULT '[]',
+    ticket_ids_json TEXT NOT NULL DEFAULT '[]',
+    trace_ids_json TEXT NOT NULL DEFAULT '[]',
+    doc_paths_json TEXT NOT NULL DEFAULT '[]',
+    doc_path TEXT NOT NULL UNIQUE,
+    verification_outcome TEXT NOT NULL DEFAULT 'pending' CHECK(verification_outcome IN ('pending','passing','failing','skipped')),
+    verification_command TEXT,
+    verification_note TEXT,
+    verified_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_decision_status ON decision(status);
+CREATE INDEX IF NOT EXISTS idx_decision_created_at ON decision(created_at);
+
+CREATE TABLE IF NOT EXISTS backlog (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('missing_doc','stale_validation','agent_friction','design_gap','ownership_gap','architecture_gap')),
+    status TEXT NOT NULL CHECK(status IN ('open','accepted','resolved')),
+    sources_json TEXT NOT NULL DEFAULT '[]',
+    impact_json TEXT NOT NULL DEFAULT '[]',
+    recommendations_json TEXT NOT NULL DEFAULT '[]',
+    ticket_ids_json TEXT NOT NULL DEFAULT '[]',
+    trace_ids_json TEXT NOT NULL DEFAULT '[]',
+    doc_paths_json TEXT NOT NULL DEFAULT '[]',
+    resolution_note TEXT,
+    resolved_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_backlog_kind ON backlog(kind);
+CREATE INDEX IF NOT EXISTS idx_backlog_status ON backlog(status);
+CREATE INDEX IF NOT EXISTS idx_backlog_created_at ON backlog(created_at);
 "#];
 
 pub const REGISTRY_MIGRATIONS: &[&str] = &[r#"

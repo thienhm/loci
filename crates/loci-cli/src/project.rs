@@ -5,7 +5,8 @@ use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
 use crate::domain::{
-    EvidenceRecord, ProjectRecord, TicketRecord, TraceListFilters, TraceRecord, ValidationRunRecord,
+    BacklogListFilters, BacklogRecord, DecisionListFilters, DecisionRecord, EvidenceRecord,
+    ProjectRecord, TicketRecord, TraceListFilters, TraceRecord, ValidationRunRecord,
 };
 
 pub fn insert_project(conn: &Connection, project: &ProjectRecord) -> Result<()> {
@@ -593,6 +594,279 @@ pub fn trace_count_for_ticket(conn: &Connection, ticket_id: &str) -> Result<usiz
     Ok(count as usize)
 }
 
+pub fn next_decision_id(conn: &Connection) -> Result<String> {
+    let mut stmt = conn.prepare("SELECT id FROM decision WHERE id LIKE 'DEC-%'")?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+
+    let mut max_suffix = 0_i64;
+    for row in rows {
+        let id = row?;
+        let Some(suffix) = id.strip_prefix("DEC-") else {
+            continue;
+        };
+        if suffix.len() == 6 && suffix.chars().all(|char| char.is_ascii_digit()) {
+            let number = suffix.parse::<i64>()?;
+            max_suffix = max_suffix.max(number);
+        }
+    }
+
+    Ok(format!("DEC-{:06}", max_suffix + 1))
+}
+
+pub fn insert_decision(conn: &Connection, decision: &DecisionRecord) -> Result<()> {
+    let context_json = serde_json::to_string(&decision.context)?;
+    let decision_json = serde_json::to_string(&decision.decision)?;
+    let consequences_json = serde_json::to_string(&decision.consequences)?;
+    let ticket_ids_json = serde_json::to_string(&decision.ticket_ids)?;
+    let trace_ids_json = serde_json::to_string(&decision.trace_ids)?;
+    let doc_paths_json = serde_json::to_string(&decision.doc_paths)?;
+
+    conn.execute(
+        r#"
+        INSERT INTO decision (
+            id, title, status, context_json, decision_json, consequences_json,
+            ticket_ids_json, trace_ids_json, doc_paths_json, doc_path,
+            verification_outcome, verification_command, verification_note, verified_at,
+            created_at, updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+        "#,
+        params![
+            decision.id,
+            decision.title,
+            decision.status,
+            context_json,
+            decision_json,
+            consequences_json,
+            ticket_ids_json,
+            trace_ids_json,
+            doc_paths_json,
+            decision.doc_path,
+            decision.verification_outcome,
+            decision.verification_command,
+            decision.verification_note,
+            decision.verified_at,
+            decision.created_at,
+            decision.updated_at,
+        ],
+    )?;
+
+    Ok(())
+}
+
+pub fn list_decisions(
+    conn: &Connection,
+    filters: &DecisionListFilters,
+) -> Result<Vec<DecisionRecord>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, title, status, context_json, decision_json, consequences_json,
+               ticket_ids_json, trace_ids_json, doc_paths_json, doc_path,
+               verification_outcome, verification_command, verification_note, verified_at,
+               created_at, updated_at
+        FROM decision
+        WHERE (?1 IS NULL OR status = ?1)
+        ORDER BY created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![filters.status], decision_from_row)?;
+    let mut decisions = Vec::new();
+    for row in rows {
+        let decision = row?;
+        if let Some(ticket_id) = &filters.ticket_id {
+            if !decision.ticket_ids.contains(ticket_id) {
+                continue;
+            }
+        }
+        if let Some(trace_id) = &filters.trace_id {
+            if !decision.trace_ids.contains(trace_id) {
+                continue;
+            }
+        }
+        decisions.push(decision);
+    }
+
+    Ok(decisions)
+}
+
+pub fn get_decision(conn: &Connection, id: &str) -> Result<Option<DecisionRecord>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, title, status, context_json, decision_json, consequences_json,
+               ticket_ids_json, trace_ids_json, doc_paths_json, doc_path,
+               verification_outcome, verification_command, verification_note, verified_at,
+               created_at, updated_at
+        FROM decision
+        WHERE id = ?1
+        "#,
+    )?;
+
+    let mut rows = stmt.query([id])?;
+    match rows.next()? {
+        Some(row) => Ok(Some(decision_from_row(row)?)),
+        None => Ok(None),
+    }
+}
+
+pub fn update_decision_verification(
+    conn: &Connection,
+    id: &str,
+    outcome: &str,
+    command: Option<&str>,
+    note: &str,
+    verified_at: &str,
+) -> Result<()> {
+    let updated = conn.execute(
+        r#"
+        UPDATE decision
+        SET verification_outcome = ?2,
+            verification_command = ?3,
+            verification_note = ?4,
+            verified_at = ?5,
+            updated_at = ?5
+        WHERE id = ?1
+        "#,
+        params![id, outcome, command, note, verified_at],
+    )?;
+
+    if updated == 0 {
+        bail!("decision {id} not found");
+    }
+
+    Ok(())
+}
+
+pub fn next_backlog_id(conn: &Connection) -> Result<String> {
+    let mut stmt = conn.prepare("SELECT id FROM backlog WHERE id LIKE 'HB-%'")?;
+    let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+
+    let mut max_suffix = 0_i64;
+    for row in rows {
+        let id = row?;
+        let Some(suffix) = id.strip_prefix("HB-") else {
+            continue;
+        };
+        if suffix.len() == 6 && suffix.chars().all(|char| char.is_ascii_digit()) {
+            let number = suffix.parse::<i64>()?;
+            max_suffix = max_suffix.max(number);
+        }
+    }
+
+    Ok(format!("HB-{:06}", max_suffix + 1))
+}
+
+pub fn insert_backlog(conn: &Connection, record: &BacklogRecord) -> Result<()> {
+    let sources_json = serde_json::to_string(&record.sources)?;
+    let impact_json = serde_json::to_string(&record.impact)?;
+    let recommendations_json = serde_json::to_string(&record.recommendations)?;
+    let ticket_ids_json = serde_json::to_string(&record.ticket_ids)?;
+    let trace_ids_json = serde_json::to_string(&record.trace_ids)?;
+    let doc_paths_json = serde_json::to_string(&record.doc_paths)?;
+
+    conn.execute(
+        r#"
+        INSERT INTO backlog (
+            id, title, kind, status, sources_json, impact_json, recommendations_json,
+            ticket_ids_json, trace_ids_json, doc_paths_json, resolution_note, resolved_at,
+            created_at, updated_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+        "#,
+        params![
+            record.id,
+            record.title,
+            record.kind,
+            record.status,
+            sources_json,
+            impact_json,
+            recommendations_json,
+            ticket_ids_json,
+            trace_ids_json,
+            doc_paths_json,
+            record.resolution_note,
+            record.resolved_at,
+            record.created_at,
+            record.updated_at,
+        ],
+    )?;
+
+    Ok(())
+}
+
+pub fn list_backlog(conn: &Connection, filters: &BacklogListFilters) -> Result<Vec<BacklogRecord>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, title, kind, status, sources_json, impact_json, recommendations_json,
+               ticket_ids_json, trace_ids_json, doc_paths_json, resolution_note, resolved_at,
+               created_at, updated_at
+        FROM backlog
+        WHERE (?1 IS NULL OR status = ?1)
+          AND (?2 IS NULL OR kind = ?2)
+        ORDER BY created_at ASC, id ASC
+        "#,
+    )?;
+
+    let rows = stmt.query_map(params![filters.status, filters.kind], backlog_from_row)?;
+    let mut records = Vec::new();
+    for row in rows {
+        let record = row?;
+        if let Some(ticket_id) = &filters.ticket_id {
+            if !record.ticket_ids.contains(ticket_id) {
+                continue;
+            }
+        }
+        records.push(record);
+    }
+
+    Ok(records)
+}
+
+pub fn get_backlog(conn: &Connection, id: &str) -> Result<Option<BacklogRecord>> {
+    let mut stmt = conn.prepare(
+        r#"
+        SELECT id, title, kind, status, sources_json, impact_json, recommendations_json,
+               ticket_ids_json, trace_ids_json, doc_paths_json, resolution_note, resolved_at,
+               created_at, updated_at
+        FROM backlog
+        WHERE id = ?1
+        "#,
+    )?;
+
+    let mut rows = stmt.query([id])?;
+    match rows.next()? {
+        Some(row) => Ok(Some(backlog_from_row(row)?)),
+        None => Ok(None),
+    }
+}
+
+pub fn update_backlog_status(
+    conn: &Connection,
+    id: &str,
+    status: &str,
+    note: Option<&str>,
+    resolved_at: Option<&str>,
+    updated_at: &str,
+) -> Result<()> {
+    let updated = conn.execute(
+        r#"
+        UPDATE backlog
+        SET status = ?2,
+            resolution_note = COALESCE(?3, resolution_note),
+            resolved_at = ?4,
+            updated_at = ?5
+        WHERE id = ?1
+        "#,
+        params![id, status, note, resolved_at, updated_at],
+    )?;
+
+    if updated == 0 {
+        bail!("backlog item {id} not found");
+    }
+
+    Ok(())
+}
+
 fn ticket_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<TicketRecord> {
     let labels_json: String = row.get(5)?;
     let labels: Vec<String> = serde_json::from_str(&labels_json)
@@ -665,6 +939,46 @@ fn json_vec_from_row(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<
     let value: String = row.get(index)?;
     serde_json::from_str(&value)
         .map_err(|err| rusqlite::Error::FromSqlConversionFailure(index, Type::Text, Box::new(err)))
+}
+
+fn decision_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<DecisionRecord> {
+    Ok(DecisionRecord {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        status: row.get(2)?,
+        context: json_vec_from_row(row, 3)?,
+        decision: json_vec_from_row(row, 4)?,
+        consequences: json_vec_from_row(row, 5)?,
+        ticket_ids: json_vec_from_row(row, 6)?,
+        trace_ids: json_vec_from_row(row, 7)?,
+        doc_paths: json_vec_from_row(row, 8)?,
+        doc_path: row.get(9)?,
+        verification_outcome: row.get(10)?,
+        verification_command: row.get(11)?,
+        verification_note: row.get(12)?,
+        verified_at: row.get(13)?,
+        created_at: row.get(14)?,
+        updated_at: row.get(15)?,
+    })
+}
+
+fn backlog_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<BacklogRecord> {
+    Ok(BacklogRecord {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        kind: row.get(2)?,
+        status: row.get(3)?,
+        sources: json_vec_from_row(row, 4)?,
+        impact: json_vec_from_row(row, 5)?,
+        recommendations: json_vec_from_row(row, 6)?,
+        ticket_ids: json_vec_from_row(row, 7)?,
+        trace_ids: json_vec_from_row(row, 8)?,
+        doc_paths: json_vec_from_row(row, 9)?,
+        resolution_note: row.get(10)?,
+        resolved_at: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
+    })
 }
 
 fn with_trace_evidence_ids(conn: &Connection, mut trace: TraceRecord) -> Result<TraceRecord> {
