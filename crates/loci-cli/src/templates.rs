@@ -3,6 +3,53 @@ use crate::domain::ProjectRecord;
 pub const DEFAULT_TEMPLATE_PACK_ID: &str = "loci-default";
 pub const DEFAULT_TEMPLATE_PACK_VERSION: &str = "1";
 
+#[derive(Debug, Clone)]
+pub struct TemplateDoc {
+    pub path: &'static str,
+    pub content: String,
+}
+
+pub fn built_in_template_docs(project: &ProjectRecord) -> Vec<TemplateDoc> {
+    vec![
+        TemplateDoc {
+            path: "AGENTS.md",
+            content: agents_md(),
+        },
+        TemplateDoc {
+            path: "LOCI.md",
+            content: loci_md(project),
+        },
+        TemplateDoc {
+            path: "loci/project.md",
+            content: project_md(project),
+        },
+        TemplateDoc {
+            path: "loci/architecture.md",
+            content: architecture_md().to_string(),
+        },
+        TemplateDoc {
+            path: "loci/validation.md",
+            content: validation_md().to_string(),
+        },
+        TemplateDoc {
+            path: "loci/guardrails.md",
+            content: guardrails_md().to_string(),
+        },
+        TemplateDoc {
+            path: "loci/current-state.md",
+            content: current_state_md().to_string(),
+        },
+        TemplateDoc {
+            path: "loci/glossary.md",
+            content: glossary_md().to_string(),
+        },
+        TemplateDoc {
+            path: "loci/backlog.md",
+            content: backlog_md().to_string(),
+        },
+    ]
+}
+
 pub fn agents_md() -> String {
     r#"# Agent Instructions
 

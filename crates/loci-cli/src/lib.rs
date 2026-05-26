@@ -14,6 +14,7 @@ pub mod registry;
 pub mod review;
 pub mod templates;
 pub mod trace;
+pub mod upgrade;
 pub mod validation;
 
 pub use app::run;

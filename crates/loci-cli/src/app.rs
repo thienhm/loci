@@ -158,6 +158,17 @@ pub enum Commands {
         json: bool,
     },
 
+    /// Upgrade project data and built-in template docs.
+    Upgrade {
+        /// Report pending changes without modifying files or database state.
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Initialize a Loci workspace in the current project.
     Init {
         /// Project display name.
@@ -978,6 +989,7 @@ pub fn run() -> Result<()> {
             skip_validation,
             json,
         } => commands::review::run(&id, skip_validation.as_deref(), json),
+        Commands::Upgrade { dry_run, json } => commands::upgrade::run(dry_run, json),
         Commands::Init { name, prefix } => commands::init::run(&name, &prefix),
         Commands::Doctor { json } => commands::doctor::run(json),
         Commands::List { json } => commands::list::run(json),
