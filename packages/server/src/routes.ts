@@ -20,6 +20,14 @@ import {
   resolveUniqueFilename,
   guessMimeType,
 } from './data'
+import {
+  hasSqliteRegistry,
+  listDashboardProjects,
+  listDashboardTickets,
+  readDashboardDoc,
+  readDashboardTicket,
+  writeDashboardDoc,
+} from './sqliteData'
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // -------------------------------------------------------------------------
@@ -28,6 +36,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /api/projects — all projects from registry
   app.get('/api/projects', async (_req, reply) => {
+    if (hasSqliteRegistry()) {
+      return reply.send(listDashboardProjects())
+    }
+
     const registry = readRegistry()
     const projects = registry.projects.map((entry) => {
       try {
@@ -41,6 +53,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
   // GET /api/projects/:projectId — single project metadata
   app.get<{ Params: { projectId: string } }>('/api/projects/:projectId', async (req, reply) => {
+    if (hasSqliteRegistry()) {
+      const project = listDashboardProjects().find((p) => p.id === req.params.projectId)
+      if (!project) return reply.status(404).send({ error: 'Project not found' })
+      return reply.send(project)
+    }
+
     const entry = findRegistryEntry(req.params.projectId)
     if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -61,6 +79,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     Params: { projectId: string }
     Querystring: { status?: string; assignee?: string; archived?: string }
   }>('/api/projects/:projectId/tickets', async (req, reply) => {
+    if (hasSqliteRegistry()) {
+      const project = listDashboardProjects().find((p) => p.id === req.params.projectId)
+      if (!project) return reply.status(404).send({ error: 'Project not found' })
+      return reply.send(listDashboardTickets(req.params.projectId, req.query))
+    }
+
     const entry = findRegistryEntry(req.params.projectId)
     if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -126,6 +150,16 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { projectId: string; ticketId: string } }>(
     '/api/projects/:projectId/tickets/:ticketId',
     async (req, reply) => {
+      if (hasSqliteRegistry()) {
+        const project = listDashboardProjects().find((p) => p.id === req.params.projectId)
+        if (!project) return reply.status(404).send({ error: 'Project not found' })
+
+        const ticket = readDashboardTicket(req.params.projectId, req.params.ticketId)
+        if (!ticket) return reply.status(404).send({ error: 'Ticket not found' })
+
+        return reply.send(ticket)
+      }
+
       const entry = findRegistryEntry(req.params.projectId)
       if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -168,6 +202,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { projectId: string; ticketId: string; filename: string } }>(
     '/api/projects/:projectId/tickets/:ticketId/docs/:filename',
     async (req, reply) => {
+      if (hasSqliteRegistry()) {
+        const content = readDashboardDoc(req.params.projectId, req.params.ticketId, req.params.filename)
+        if (content === null) return reply.status(404).send({ error: 'Document not found' })
+        return reply.type('text/plain').send(content)
+      }
+
       const entry = findRegistryEntry(req.params.projectId)
       if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -183,6 +223,15 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     Params: { projectId: string; ticketId: string; filename: string }
     Body: string
   }>('/api/projects/:projectId/tickets/:ticketId/docs/:filename', async (req, reply) => {
+    if (hasSqliteRegistry()) {
+      if (!req.params.filename.endsWith('.md')) {
+        return reply.status(400).send({ error: 'Only .md files are allowed' })
+      }
+      const wrote = writeDashboardDoc(req.params.projectId, req.params.ticketId, req.params.filename, req.body)
+      if (!wrote) return reply.status(404).send({ error: 'Document not found' })
+      return reply.status(204).send()
+    }
+
     const entry = findRegistryEntry(req.params.projectId)
     if (!entry) return reply.status(404).send({ error: 'Project not found' })
 

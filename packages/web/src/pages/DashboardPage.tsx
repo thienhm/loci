@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { FolderKanban, Plus, AlertCircle, Loader2 } from 'lucide-react'
+import { Activity, AlertCircle, CheckCircle2, FolderKanban, Loader2, Plus, ShieldAlert } from 'lucide-react'
 import { fetchProjects, fetchTickets } from '../api/client'
-import type { Project, Ticket, TicketCounts } from '../types'
+import type { Project, ProjectHealthStatus, Ticket, TicketCounts } from '../types'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -16,7 +17,7 @@ export function DashboardPage() {
     return (
       <div style={styles.center}>
         <Loader2 size={24} style={{ color: 'var(--color-primary)', animation: 'spin 1s linear infinite' }} />
-        <span style={{ color: 'var(--color-on-surface-variant)', marginTop: '12px', fontSize: '13px' }}>Loading projects…</span>
+        <span style={{ color: 'var(--color-on-surface-variant)', marginTop: '12px', fontSize: '13px' }}>Loading projects...</span>
       </div>
     )
   }
@@ -26,15 +27,24 @@ export function DashboardPage() {
       <div style={styles.center}>
         <AlertCircle size={24} style={{ color: 'var(--color-error)' }} />
         <span style={{ color: 'var(--color-error)', marginTop: '12px', fontSize: '13px' }}>
-          Could not reach server — is <code>loci serve</code> running?
+          Could not reach server. Is <code>loci serve</code> running?
         </span>
       </div>
     )
   }
 
+  const totals = projects.reduce(
+    (acc, project) => {
+      acc.open += project.openTicketCount ?? 0
+      acc.review += project.reviewTicketCount ?? 0
+      acc.validation += project.validationFailureCount ?? 0
+      return acc
+    },
+    { open: 0, review: 0, validation: 0 }
+  )
+
   return (
     <div style={styles.page}>
-      {/* Page header */}
       <div style={styles.header}>
         <div>
           <h1 id="dashboard-heading" style={styles.heading}>Active Projects</h1>
@@ -44,6 +54,17 @@ export function DashboardPage() {
               : `${projects.length} project${projects.length === 1 ? '' : 's'}`}
           </p>
         </div>
+
+        <div style={styles.headerMetrics}>
+          <Metric icon={<Activity size={14} />} label={`${totals.open} open`} />
+          <Metric icon={<CheckCircle2 size={14} />} label={`${totals.review} in review`} />
+          <Metric
+            icon={<ShieldAlert size={14} />}
+            label={`${totals.validation} validation failing`}
+            tone={totals.validation > 0 ? 'danger' : 'neutral'}
+          />
+        </div>
+
         <button
           id="new-project-cta"
           onClick={() => navigate('/')}
@@ -56,7 +77,6 @@ export function DashboardPage() {
         </button>
       </div>
 
-      {/* Project grid */}
       {projects.length === 0 ? (
         <EmptyState />
       ) : (
@@ -74,63 +94,81 @@ export function DashboardPage() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Project card
-// ─────────────────────────────────────────────────────────────────────────────
+function Metric({ icon, label, tone = 'neutral' }: { icon: ReactNode; label: string; tone?: 'neutral' | 'danger' }) {
+  return (
+    <span
+      style={{
+        ...styles.metric,
+        color: tone === 'danger' ? 'var(--color-error)' : 'var(--color-on-surface-variant)',
+      }}
+    >
+      {icon}
+      {label}
+    </span>
+  )
+}
 
 function ProjectCard({ project, onOpen }: { project: Project; onOpen: () => void }) {
+  const hasSummary = project.openTicketCount !== undefined
   const { data: tickets = [] } = useQuery<Ticket[]>({
     queryKey: ['tickets', project.id],
     queryFn: () => fetchTickets(project.id),
+    enabled: !hasSummary,
   })
 
-  const counts: TicketCounts = tickets.reduce(
-    (acc, t) => {
-      if (t.status === 'todo') acc.todo++
-      else if (t.status === 'in_progress') acc.in_progress++
-      else if (t.status === 'in_review') acc.in_review++
-      else if (t.status === 'done') acc.done++
-      return acc
-    },
-    { todo: 0, in_progress: 0, in_review: 0, done: 0 }
-  )
-
-  const total = tickets.length
+  const counts = project.ticketStatusCounts ?? countTickets(tickets)
+  const openCount = project.openTicketCount ?? tickets.filter((ticket) => normalizedStatus(ticket.status) !== 'done').length
+  const reviewCount = project.reviewTicketCount ?? counts.in_review
+  const validationFailures = project.validationFailureCount ?? tickets.filter((ticket) => ticket.validationState === 'failing').length
+  const available = project.available !== false
+  const total = hasSummary ? openCount + counts.done : tickets.length
   const donePercent = total > 0 ? Math.round((counts.done / total) * 100) : 0
 
   return (
     <div
       id={`project-card-${project.id}`}
-      style={styles.card}
-      onClick={onOpen}
+      style={{
+        ...styles.card,
+        ...(available ? {} : styles.unavailableCard),
+      }}
+      onClick={() => {
+        if (available) onOpen()
+      }}
       onMouseEnter={(e) => {
+        if (!available) return
         e.currentTarget.style.boxShadow = '0 4px 20px rgba(25, 28, 30, 0.06)'
         e.currentTarget.style.borderColor = 'rgba(188, 201, 198, 0.2)'
       }}
       onMouseLeave={(e) => {
+        if (!available) return
         e.currentTarget.style.boxShadow = 'none'
         e.currentTarget.style.borderColor = 'transparent'
       }}
     >
-      {/* Card icon */}
-      <div style={styles.cardIconContainer}>
-        <FolderKanban size={20} color="var(--color-primary)" />
+      <div style={styles.cardTopRow}>
+        <div style={styles.cardIconContainer}>
+          <FolderKanban size={20} color="var(--color-primary)" />
+        </div>
+        <HealthBadge status={project.healthStatus ?? 'healthy'} />
       </div>
 
-      {/* Project name & description */}
       <h3 style={styles.projectName}>{project.name}</h3>
       <p style={styles.projectDesc}>
-        {project.prefix} · {total} ticket{total !== 1 ? 's' : ''}
+        {project.prefix}
       </p>
+      {project.path && <p style={styles.projectPath}>{project.path}</p>}
 
-      {/* Status capsules */}
       <div style={styles.capsuleRow}>
-        <StatusCapsule label="Todo" count={counts.todo} variant="todo" />
-        <StatusCapsule label="In Progress" count={counts.in_progress} variant="in_progress" />
+        <StatusCapsule label="Open" count={openCount} variant="open" />
+        <StatusCapsule label="Review" count={reviewCount} variant="review" />
+        <StatusCapsule label="Validation" count={validationFailures} variant={validationFailures > 0 ? 'danger' : 'done'} />
         <StatusCapsule label="Done" count={counts.done} variant="done" />
       </div>
 
-      {/* Progress bar */}
+      {!available && project.unavailableReason && (
+        <p style={styles.unavailableReason}>{project.unavailableReason}</p>
+      )}
+
       <div style={styles.progressSection}>
         <div style={styles.progressMeta}>
           <span>Progress</span>
@@ -149,6 +187,42 @@ function ProjectCard({ project, onOpen }: { project: Project; onOpen: () => void
   )
 }
 
+function countTickets(tickets: Ticket[]): TicketCounts {
+  return tickets.reduce(
+    (acc, ticket) => {
+      const status = normalizedStatus(ticket.status)
+      if (status === 'idea') acc.idea++
+      else if (status === 'shaped') acc.shaped++
+      else if (status === 'ready') acc.ready++
+      else if (status === 'in_progress') acc.in_progress++
+      else if (status === 'in_review') acc.in_review++
+      else if (status === 'done') acc.done++
+      return acc
+    },
+    { idea: 0, shaped: 0, ready: 0, in_progress: 0, in_review: 0, done: 0 }
+  )
+}
+
+function normalizedStatus(status: Ticket['status']): Exclude<Ticket['status'], 'todo'> {
+  return status === 'todo' ? 'idea' : status
+}
+
+function HealthBadge({ status }: { status: ProjectHealthStatus }) {
+  const label = status[0].toUpperCase() + status.slice(1)
+  const color =
+    status === 'missing' || status === 'error'
+      ? 'var(--color-error)'
+      : status === 'warning'
+        ? '#8a5a00'
+        : 'var(--color-primary)'
+
+  return (
+    <span style={{ ...styles.healthBadge, color }}>
+      {label}
+    </span>
+  )
+}
+
 function StatusCapsule({
   label,
   count,
@@ -156,11 +230,12 @@ function StatusCapsule({
 }: {
   label: string
   count: number
-  variant: 'todo' | 'in_progress' | 'done'
+  variant: 'open' | 'review' | 'danger' | 'done'
 }) {
   const capsuleStyles: Record<string, { bg: string; color: string }> = {
-    todo: { bg: 'var(--color-secondary-container)', color: 'var(--color-on-secondary-container)' },
-    in_progress: { bg: 'rgba(107, 216, 203, 0.2)', color: 'var(--color-primary)' },
+    open: { bg: 'var(--color-secondary-container)', color: 'var(--color-on-secondary-container)' },
+    review: { bg: 'rgba(107, 216, 203, 0.2)', color: 'var(--color-primary)' },
+    danger: { bg: 'rgba(186, 26, 26, 0.1)', color: 'var(--color-error)' },
     done: { bg: 'var(--color-surface-container-highest)', color: 'var(--color-on-surface-variant)' },
   }
 
@@ -172,7 +247,7 @@ function StatusCapsule({
         display: 'inline-flex',
         alignItems: 'center',
         padding: '4px 10px',
-        borderRadius: '9999px',
+        borderRadius: '8px',
         fontSize: '10px',
         fontWeight: '700',
         background: s.bg,
@@ -183,10 +258,6 @@ function StatusCapsule({
     </span>
   )
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Empty state
-// ─────────────────────────────────────────────────────────────────────────────
 
 function EmptyState() {
   return (
@@ -204,10 +275,6 @@ function EmptyState() {
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Styles
-// ─────────────────────────────────────────────────────────────────────────────
-
 const styles = {
   page: {
     padding: '32px 36px',
@@ -221,13 +288,33 @@ const styles = {
     justifyContent: 'space-between',
     marginBottom: '32px',
     gap: '16px',
+    flexWrap: 'wrap' as const,
+  },
+  headerMetrics: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap' as const,
+    marginLeft: 'auto',
+  },
+  metric: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '6px',
+    minHeight: '32px',
+    padding: '6px 10px',
+    borderRadius: '8px',
+    background: 'var(--color-surface-container-lowest)',
+    border: '1px solid var(--color-outline-variant)',
+    fontSize: '12px',
+    fontWeight: '700',
   },
   heading: {
     fontSize: '1.5rem',
     fontWeight: '800',
     color: 'var(--color-on-surface)',
     margin: 0,
-    letterSpacing: '-0.02em',
+    letterSpacing: '0',
   },
   subheading: {
     fontSize: '12px',
@@ -239,6 +326,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+    minHeight: '40px',
     padding: '10px 20px',
     borderRadius: '8px',
     border: 'none',
@@ -259,7 +347,7 @@ const styles = {
   card: {
     background: 'var(--color-surface-container-lowest)',
     border: '1px solid transparent',
-    borderRadius: '12px',
+    borderRadius: '8px',
     padding: '24px',
     cursor: 'pointer',
     transition: 'all 300ms ease',
@@ -267,6 +355,16 @@ const styles = {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '4px',
+  },
+  unavailableCard: {
+    borderColor: 'rgba(186, 26, 26, 0.22)',
+    cursor: 'default',
+  },
+  cardTopRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '12px',
   },
   cardIconContainer: {
     width: '40px',
@@ -278,6 +376,16 @@ const styles = {
     justifyContent: 'center',
     marginBottom: '12px',
   },
+  healthBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: '24px',
+    padding: '3px 8px',
+    borderRadius: '8px',
+    background: 'var(--color-surface-container-high)',
+    fontSize: '11px',
+    fontWeight: '800',
+  },
   projectName: {
     fontSize: '16px',
     fontWeight: '600',
@@ -288,14 +396,29 @@ const styles = {
   projectDesc: {
     fontSize: '13px',
     color: 'var(--color-on-surface-variant)',
-    margin: '0 0 20px',
+    margin: '0 0 4px',
     lineHeight: 1.5,
+    overflowWrap: 'anywhere' as const,
+  },
+  projectPath: {
+    fontSize: '12px',
+    color: 'var(--color-on-surface-variant)',
+    margin: '0 0 18px',
+    lineHeight: 1.4,
+    overflowWrap: 'anywhere' as const,
   },
   capsuleRow: {
     display: 'flex',
     flexWrap: 'wrap' as const,
     gap: '8px',
     marginBottom: '20px',
+  },
+  unavailableReason: {
+    color: 'var(--color-error)',
+    fontSize: '12px',
+    lineHeight: 1.4,
+    margin: '-8px 0 16px',
+    overflowWrap: 'anywhere' as const,
   },
   progressSection: {
     marginTop: 'auto',
