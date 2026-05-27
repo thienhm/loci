@@ -3,6 +3,7 @@ use predicates::str::contains;
 use rusqlite::Connection;
 use serde_json::Value;
 use std::fs;
+use std::path::Path;
 use tempfile::TempDir;
 
 fn initialized_workspace() -> (TempDir, TempDir) {
@@ -18,6 +19,42 @@ fn initialized_workspace() -> (TempDir, TempDir) {
         .success();
 
     (home, workspace)
+}
+
+fn seed_legacy_ticket(
+    workspace_root: &Path,
+    id: &str,
+    status: &str,
+    archived: bool,
+    with_unsupported_file: bool,
+) {
+    let ticket_dir = workspace_root.join(".loci/tickets").join(id);
+    fs::create_dir_all(&ticket_dir).expect("create legacy ticket dir");
+    fs::write(
+        ticket_dir.join("ticket.json"),
+        format!(
+            r#"{{
+  "id": "{id}",
+  "title": "Legacy {id}",
+  "status": "{status}",
+  "priority": "medium",
+  "labels": ["legacy", "import"],
+  "assignee": "agent:legacy",
+  "progress": 42,
+  "archived": {archived},
+  "createdAt": "2026-05-20T10:00:00.000Z",
+  "updatedAt": "2026-05-21T11:00:00.000Z"
+}}"#
+        ),
+    )
+    .expect("write legacy ticket.json");
+    fs::write(ticket_dir.join("description.md"), "# Legacy Description\n")
+        .expect("write description");
+
+    if with_unsupported_file {
+        fs::create_dir_all(ticket_dir.join("files")).expect("create files dir");
+        fs::write(ticket_dir.join("files/screenshot.png"), "png").expect("write file");
+    }
 }
 
 #[test]
@@ -285,4 +322,88 @@ fn upgrade_updates_stale_project_version_metadata() {
         .query_row("SELECT loci_version FROM project", [], |row| row.get(0))
         .expect("project db version");
     assert_eq!(db_version, env!("CARGO_PKG_VERSION"));
+}
+
+#[test]
+fn upgrade_dry_run_reports_legacy_json_ticket_import_actions() {
+    let (home, workspace) = initialized_workspace();
+    seed_legacy_ticket(workspace.path(), "EXA-900", "todo", false, true);
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["upgrade", "--dry-run", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("parse upgrade json");
+    assert!(json["legacy_import"]["tickets"]
+        .as_array()
+        .expect("legacy tickets")
+        .iter()
+        .any(|action| action["ticket_id"] == "EXA-900" && action["status"] == "insert"));
+    assert!(json["legacy_import"]["unsupported"]
+        .as_array()
+        .expect("unsupported")
+        .iter()
+        .any(|item| item["ticket_id"] == "EXA-900"));
+}
+
+#[test]
+fn upgrade_apply_imports_legacy_ticket_and_is_idempotent() {
+    let (home, workspace) = initialized_workspace();
+    seed_legacy_ticket(workspace.path(), "EXA-901", "todo", false, false);
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .arg("upgrade")
+        .assert()
+        .success();
+
+    let conn = Connection::open(workspace.path().join(".loci/loci.db")).expect("open project db");
+    let imported: (String, String, String, String, i64) = conn
+        .query_row(
+            "SELECT id, status, created_at, updated_at, progress FROM ticket WHERE id = 'EXA-901'",
+            [],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
+        )
+        .expect("imported ticket row");
+    assert_eq!(imported.0, "EXA-901");
+    assert_eq!(imported.1, "idea");
+    assert_eq!(imported.2, "2026-05-20T10:00:00.000Z");
+    assert_eq!(imported.3, "2026-05-21T11:00:00.000Z");
+    assert_eq!(imported.4, 42);
+    drop(conn);
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .arg("upgrade")
+        .assert()
+        .success();
+
+    let conn = Connection::open(workspace.path().join(".loci/loci.db")).expect("open project db");
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM ticket WHERE id = 'EXA-901'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count imported ticket");
+    assert_eq!(count, 1);
 }
