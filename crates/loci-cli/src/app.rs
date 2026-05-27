@@ -169,6 +169,25 @@ pub enum Commands {
         json: bool,
     },
 
+    /// Update the managed Loci tool binary.
+    Update {
+        /// Release tag to install, for example v1.2.3. Defaults to the latest release.
+        #[arg(long)]
+        version: Option<String>,
+
+        /// GitHub repository that owns release artifacts.
+        #[arg(long, default_value = "thienhm/loci")]
+        repo: String,
+
+        /// Read release artifacts from a local directory instead of GitHub.
+        #[arg(long, hide = true)]
+        release_dir: Option<std::path::PathBuf>,
+
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Initialize a Loci workspace in the current project.
     Init {
         /// Project display name.
@@ -990,6 +1009,12 @@ pub fn run() -> Result<()> {
             json,
         } => commands::review::run(&id, skip_validation.as_deref(), json),
         Commands::Upgrade { dry_run, json } => commands::upgrade::run(dry_run, json),
+        Commands::Update {
+            version,
+            repo,
+            release_dir,
+            json,
+        } => commands::update::run(version, repo, release_dir, json),
         Commands::Init { name, prefix } => commands::init::run(&name, &prefix),
         Commands::Doctor { json } => commands::doctor::run(json),
         Commands::List { json } => commands::list::run(json),
