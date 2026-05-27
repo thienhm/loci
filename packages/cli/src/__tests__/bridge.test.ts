@@ -40,21 +40,19 @@ describe('TypeScript to Rust CLI bridge', () => {
     expect(action.warning).toContain('TypeScript compatibility fallback')
   })
 
-  it('keeps status and patch as TypeScript fallbacks pending SQLite write-side ownership', () => {
-    for (const command of ['status', 'patch']) {
+  it('delegates status, patch, and doc to Rust when managed binary exists', () => {
+    for (const command of ['status', 'patch', 'doc']) {
       const action = planBridge([command, 'LCI-001'], {
         env: { HOME: '/tmp/loci-home' },
         binaryExists: () => true,
       })
 
-      expect(action.kind).toBe('typescript')
-      expect(action.commandName).toBe(command)
-      expect(action.warning).toContain('TypeScript compatibility fallback')
+      expect(action.kind).toBe('delegate')
     }
   })
 
   it('keeps unresolved compatibility commands as TypeScript fallbacks', () => {
-    for (const command of ['serve', 'open', 'doc', 'attachments']) {
+    for (const command of ['serve', 'open', 'attachments']) {
       const action = planBridge([command, '--help'], {
         env: { HOME: '/tmp/loci-home' },
         binaryExists: () => false,
@@ -90,7 +88,7 @@ describe('TypeScript to Rust CLI bridge', () => {
 
   it('does not inspect the filesystem for TypeScript fallback commands', () => {
     let inspected = false
-    const action = planBridge(['doc', 'read', 'LCI-001', 'description.md'], {
+    const action = planBridge(['attachments', 'LCI-001'], {
       env: { HOME: '/tmp/loci-home' },
       binaryExists: () => {
         inspected = true
