@@ -147,6 +147,21 @@ function seedSqliteRegistryAndProject() {
   return sqliteWorkspace
 }
 
+function readRegistrySummary(projectId: string) {
+  const registry = new Database(join(tmpHome, '.loci', 'registry.db'))
+  try {
+    return registry
+      .query<{ open_ticket_count: number; review_ticket_count: number; validation_failure_count: number }, [string]>(
+        `SELECT open_ticket_count, review_ticket_count, validation_failure_count
+         FROM registered_project
+         WHERE id = ?1`
+      )
+      .get(projectId)
+  } finally {
+    registry.close()
+  }
+}
+
 async function buildApp() {
   const instance = Fastify({ logger: false })
   await instance.register(cors, { origin: true })
@@ -364,6 +379,12 @@ describe('POST /api/projects/:projectId/tickets', () => {
     expect(body.labels).toEqual(['ops'])
     expect(existsSync(join(sqliteWorkspace, '.loci', 'tickets', 'SQL-002', 'ticket.json'))).toBe(false)
     expect(existsSync(join(sqliteWorkspace, 'loci', 'tickets', 'SQL-002', 'story.md'))).toBe(true)
+
+    expect(readRegistrySummary('sqlite-project-uuid')).toEqual({
+      open_ticket_count: 2,
+      review_ticket_count: 0,
+      validation_failure_count: 1,
+    })
   })
 })
 
@@ -466,6 +487,12 @@ describe('PATCH /api/projects/:projectId/tickets/:ticketId', () => {
     expect(patched.progress).toBe(75)
     expect(patched.labels).toEqual(['cutover'])
     expect(patched.updatedAt).not.toBe(beforeBody.updatedAt)
+
+    expect(readRegistrySummary('sqlite-project-uuid')).toEqual({
+      open_ticket_count: 1,
+      review_ticket_count: 0,
+      validation_failure_count: 1,
+    })
   })
 
   it('rejects invalid SQLite patch payloads', async () => {

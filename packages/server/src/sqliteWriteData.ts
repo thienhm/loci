@@ -40,6 +40,12 @@ interface WritableProject {
   dbPath: string
 }
 
+interface RegistrySummaryCounts {
+  open_ticket_count: number
+  review_ticket_count: number
+  validation_failure_count: number
+}
+
 export function validateSqliteWritableProject(projectId: string, home = process.env.HOME!): WriteError | null {
   const result = resolveWritableProject(projectId, home)
   return 'error' in result ? result.error : null
@@ -84,6 +90,7 @@ export function createDashboardTicketInSqlite(
       )
     })
     tx()
+    refreshRegistrySummary(resolved, home)
 
     const absStoryPath = join(resolved.row.path, storyPath)
     mkdirSync(dirname(absStoryPath), { recursive: true })
@@ -181,6 +188,7 @@ export function patchDashboardTicketInSqlite(
       )
     })
     tx()
+    refreshRegistrySummary(resolved, home)
   } catch (error) {
     return { error: { statusCode: 500, message: errorMessage(error, 'Failed to patch SQLite ticket') } }
   } finally {
@@ -275,4 +283,38 @@ function normalizeProgress(input: unknown): number | undefined {
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
+}
+
+function refreshRegistrySummary(project: WritableProject, home: string): void {
+  const projectDb = Database.open(project.dbPath, { readonly: true })
+  let counts: RegistrySummaryCounts | null = null
+  try {
+    counts = projectDb
+      .query<RegistrySummaryCounts, []>(
+        `SELECT
+           COALESCE(SUM(CASE WHEN status != 'done' THEN 1 ELSE 0 END), 0) AS open_ticket_count,
+           COALESCE(SUM(CASE WHEN status = 'in_review' THEN 1 ELSE 0 END), 0) AS review_ticket_count,
+           COALESCE(SUM(CASE WHEN validation_state = 'failing' THEN 1 ELSE 0 END), 0) AS validation_failure_count
+         FROM ticket`
+      )
+      .get()
+  } finally {
+    projectDb.close()
+  }
+
+  if (!counts) return
+
+  const registry = Database.open(registryDbPath(home))
+  try {
+    registry.run(
+      `UPDATE registered_project
+       SET open_ticket_count = ?1,
+           review_ticket_count = ?2,
+           validation_failure_count = ?3
+       WHERE id = ?4`,
+      [counts.open_ticket_count, counts.review_ticket_count, counts.validation_failure_count, project.row.id]
+    )
+  } finally {
+    registry.close()
+  }
 }
