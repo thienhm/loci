@@ -222,6 +222,71 @@ pub enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Update a ticket status.
+    Status {
+        /// Ticket id, for example LCI-001.
+        id: String,
+        /// New status.
+        status: String,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Update ticket fields.
+    Patch {
+        /// Ticket id, for example LCI-001.
+        id: String,
+        /// Set assignee (for example agent:codex, human, or null).
+        #[arg(long)]
+        assignee: Option<String>,
+        /// Set progress 0-100.
+        #[arg(long)]
+        progress: Option<i64>,
+        /// Set priority (low, medium, high).
+        #[arg(long)]
+        priority: Option<String>,
+        /// Comma-separated labels.
+        #[arg(long)]
+        labels: Option<String>,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Read or write ticket docs.
+    Doc {
+        #[command(subcommand)]
+        command: DocCommands,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DocCommands {
+    /// Read a doc file from a ticket.
+    Read {
+        /// Ticket id, for example LCI-001.
+        id: String,
+        /// Doc filename, for example story.md.
+        filename: String,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Write content to a doc file in a ticket.
+    Write {
+        /// Ticket id, for example LCI-001.
+        id: String,
+        /// Doc filename, for example story.md.
+        filename: String,
+        /// Content to write.
+        #[arg(long)]
+        content: String,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1019,5 +1084,41 @@ pub fn run() -> Result<()> {
         Commands::Doctor { json } => commands::doctor::run(json),
         Commands::List { json } => commands::list::run(json),
         Commands::Get { id, json } => commands::get::run(&id, json),
+        Commands::Status { id, status, json } => commands::status::run(&id, &status, json),
+        Commands::Patch {
+            id,
+            assignee,
+            progress,
+            priority,
+            labels,
+            json,
+        } => {
+            let clear_assignee = assignee.as_deref() == Some("null");
+            commands::patch::run(commands::patch::PatchInput {
+                id,
+                assignee: assignee.filter(|value| value != "null"),
+                clear_assignee,
+                progress,
+                priority,
+                labels: labels.map(|value| {
+                    value
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|label| !label.is_empty())
+                        .map(ToOwned::to_owned)
+                        .collect()
+                }),
+                json,
+            })
+        }
+        Commands::Doc { command } => match command {
+            DocCommands::Read { id, filename, json } => commands::doc::read(&id, &filename, json),
+            DocCommands::Write {
+                id,
+                filename,
+                content,
+                json,
+            } => commands::doc::write(&id, &filename, &content, json),
+        },
     }
 }

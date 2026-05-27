@@ -230,6 +230,45 @@ pub fn update_ticket_readiness(
     Ok(())
 }
 
+pub fn update_ticket_mutable_fields(
+    conn: &Connection,
+    id: &str,
+    status: &str,
+    priority: &str,
+    assignee: Option<&str>,
+    labels: &[String],
+    progress: i64,
+) -> Result<()> {
+    let labels_json = serde_json::to_string(labels)?;
+    let updated = conn.execute(
+        r#"
+        UPDATE ticket
+        SET status = ?2,
+            priority = ?3,
+            assignee = ?4,
+            labels_json = ?5,
+            progress = ?6,
+            updated_at = ?7
+        WHERE id = ?1
+        "#,
+        params![
+            id,
+            status,
+            priority,
+            assignee,
+            labels_json,
+            progress,
+            OffsetDateTime::now_utc().format(&Rfc3339)?,
+        ],
+    )?;
+
+    if updated == 0 {
+        bail!("ticket {id} not found");
+    }
+
+    Ok(())
+}
+
 pub fn next_evidence_id(conn: &Connection) -> Result<String> {
     let mut stmt = conn.prepare("SELECT id FROM evidence WHERE id LIKE 'EV-%'")?;
     let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;

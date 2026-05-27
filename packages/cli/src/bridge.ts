@@ -37,9 +37,6 @@ export const rustPrimaryCommands = new Set([
 export const typescriptFallbackCommands = new Set([
   'serve',
   'open',
-  'status',
-  'patch',
-  'doc',
   'attachments',
 ])
 
