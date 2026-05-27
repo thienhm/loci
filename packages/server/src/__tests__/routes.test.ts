@@ -331,6 +331,26 @@ describe('POST /api/projects/:projectId/tickets', () => {
     })
     expect(second.json<any>().id).toBe('TST-002')
   })
+
+  it('creates SQLite ticket rows when registry.db exists', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/projects/sqlite-project-uuid/tickets',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'SQLite created ticket', priority: 'low', labels: ['ops'] }),
+    })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json<any>()
+    expect(body.id).toBe('SQL-002')
+    expect(body.status).toBe('idea')
+    expect(body.priority).toBe('low')
+    expect(body.labels).toEqual(['ops'])
+    expect(existsSync(join(sqliteWorkspace, '.loci', 'tickets', 'SQL-002', 'ticket.json'))).toBe(false)
+    expect(existsSync(join(sqliteWorkspace, 'loci', 'tickets', 'SQL-002', 'story.md'))).toBe(true)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -410,6 +430,40 @@ describe('PATCH /api/projects/:projectId/tickets/:ticketId', () => {
       body: JSON.stringify({ status: 'done' }),
     })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('patches SQLite tickets and updates updatedAt', async () => {
+    seedSqliteRegistryAndProject()
+    const before = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001',
+    })
+    const beforeBody = before.json<any>()
+
+    const patch = await app.inject({
+      method: 'PATCH',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'todo', progress: 75, labels: ['cutover'] }),
+    })
+    expect(patch.statusCode).toBe(200)
+    const patched = patch.json<any>()
+    expect(patched.status).toBe('idea')
+    expect(patched.progress).toBe(75)
+    expect(patched.labels).toEqual(['cutover'])
+    expect(patched.updatedAt).not.toBe(beforeBody.updatedAt)
+  })
+
+  it('rejects invalid SQLite patch payloads', async () => {
+    seedSqliteRegistryAndProject()
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ progress: 101 }),
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json<any>().error).toContain('Invalid progress')
   })
 })
 
@@ -493,6 +547,24 @@ describe('docs endpoints', () => {
       url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/docs/story.md',
     })
     expect(get.body).toBe('# Story\n\nUpdated body.')
+  })
+
+  it('PUT fails for unhealthy SQLite projects', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const registry = new Database(join(tmpHome, '.loci', 'registry.db'))
+    registry.run(`UPDATE registered_project SET health_status = 'warning' WHERE id = 'sqlite-project-uuid'`)
+    registry.close()
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/docs/story.md',
+      headers: { 'content-type': 'text/plain' },
+      body: '# Story\n\nShould fail.',
+    })
+    expect(put.statusCode).toBe(409)
+    expect(put.json<any>().error).toContain('not writable')
+
+    expect(readFileSync(join(sqliteWorkspace, 'loci', 'tickets', 'SQL-001', 'story.md'), 'utf8')).toBe('# Story\n\nSQLite ticket body.')
   })
 })
 

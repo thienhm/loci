@@ -28,6 +28,11 @@ import {
   readDashboardTicket,
   writeDashboardDoc,
 } from './sqliteData'
+import {
+  createDashboardTicketInSqlite,
+  patchDashboardTicketInSqlite,
+  validateSqliteWritableProject,
+} from './sqliteWriteData'
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // -------------------------------------------------------------------------
@@ -112,6 +117,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     Params: { projectId: string }
     Body: { title: string; priority?: string; labels?: string[]; assignee?: string | null }
   }>('/api/projects/:projectId/tickets', async (req, reply) => {
+    if (hasSqliteRegistry()) {
+      const result = createDashboardTicketInSqlite(req.params.projectId, req.body)
+      if ('error' in result) return reply.status(result.error.statusCode).send({ error: result.error.message })
+      return reply.status(201).send(result.ticket)
+    }
+
     const entry = findRegistryEntry(req.params.projectId)
     if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -175,6 +186,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     Params: { projectId: string; ticketId: string }
     Body: Partial<Omit<Ticket, 'id' | 'createdAt'>>
   }>('/api/projects/:projectId/tickets/:ticketId', async (req, reply) => {
+    if (hasSqliteRegistry()) {
+      const result = patchDashboardTicketInSqlite(req.params.projectId, req.params.ticketId, req.body)
+      if ('error' in result) return reply.status(result.error.statusCode).send({ error: result.error.message })
+      return reply.send(result.ticket)
+    }
+
     const entry = findRegistryEntry(req.params.projectId)
     if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -226,6 +243,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     if (hasSqliteRegistry()) {
       if (!req.params.filename.endsWith('.md')) {
         return reply.status(400).send({ error: 'Only .md files are allowed' })
+      }
+      const writeError = validateSqliteWritableProject(req.params.projectId)
+      if (writeError) {
+        return reply.status(writeError.statusCode).send({ error: writeError.message })
       }
       const wrote = writeDashboardDoc(req.params.projectId, req.params.ticketId, req.params.filename, req.body)
       if (!wrote) return reply.status(404).send({ error: 'Document not found' })
