@@ -52,7 +52,7 @@ describe('TypeScript to Rust CLI bridge', () => {
   })
 
   it('keeps unresolved compatibility commands as TypeScript fallbacks', () => {
-    for (const command of ['serve', 'open', 'attachments']) {
+    for (const command of ['serve', 'open']) {
       const action = planBridge([command, '--help'], {
         env: { HOME: '/tmp/loci-home' },
         binaryExists: () => false,
@@ -86,18 +86,18 @@ describe('TypeScript to Rust CLI bridge', () => {
     expect(action.message).not.toContain('Run `loci update` to install')
   })
 
-  it('does not inspect the filesystem for TypeScript fallback commands', () => {
+  it('checks for managed binary when attachments command is requested', () => {
     let inspected = false
     const action = planBridge(['attachments', 'LCI-001'], {
       env: { HOME: '/tmp/loci-home' },
       binaryExists: () => {
         inspected = true
-        return false
+        return true
       },
     })
 
-    expect(action.kind).toBe('typescript')
-    expect(inspected).toBe(false)
+    expect(action.kind).toBe('delegate')
+    expect(inspected).toBe(true)
   })
 
   it('retires sync with migration guidance instead of keeping a TypeScript fallback', () => {

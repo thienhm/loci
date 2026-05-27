@@ -165,6 +165,22 @@ CREATE TABLE IF NOT EXISTS backlog (
 CREATE INDEX IF NOT EXISTS idx_backlog_kind ON backlog(kind);
 CREATE INDEX IF NOT EXISTS idx_backlog_status ON backlog(status);
 CREATE INDEX IF NOT EXISTS idx_backlog_created_at ON backlog(created_at);
+
+CREATE TABLE IF NOT EXISTS ticket_file (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    source TEXT NOT NULL CHECK(source IN ('upload', 'legacy_import')),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(ticket_id) REFERENCES ticket(id),
+    UNIQUE(ticket_id, filename)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ticket_file_ticket_id ON ticket_file(ticket_id);
 "#];
 
 pub const REGISTRY_MIGRATIONS: &[&str] = &[r#"

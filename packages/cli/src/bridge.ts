@@ -37,7 +37,6 @@ export const rustPrimaryCommands = new Set([
 export const typescriptFallbackCommands = new Set([
   'serve',
   'open',
-  'attachments',
 ])
 
 export const retiredCommands = new Set(['sync', 'skill'])

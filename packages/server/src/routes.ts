@@ -33,6 +33,14 @@ import {
   patchDashboardTicketInSqlite,
   validateSqliteWritableProject,
 } from './sqliteWriteData'
+import {
+  deleteSqliteFile,
+  listSqliteAttachments,
+  listSqliteFiles,
+  readSqliteFile,
+  replaceSqliteAttachments,
+  uploadSqliteFile,
+} from './sqliteFileData'
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // -------------------------------------------------------------------------
@@ -273,6 +281,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { projectId: string; ticketId: string } }>(
     '/api/projects/:projectId/tickets/:ticketId/attachments',
     async (req, reply) => {
+      if (hasSqliteRegistry()) {
+        const result = listSqliteAttachments(req.params.projectId, req.params.ticketId)
+        if ('error' in result) return reply.status(result.error.statusCode).send({ error: result.error.message })
+        return reply.send(result.attachments)
+      }
+
       const entry = findRegistryEntry(req.params.projectId)
       if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -286,6 +300,15 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     Params: { projectId: string; ticketId: string }
     Body: string[]
   }>('/api/projects/:projectId/tickets/:ticketId/attachments', async (req, reply) => {
+    if (hasSqliteRegistry()) {
+      if (!Array.isArray(req.body)) {
+        return reply.status(400).send({ error: 'Body must be an array of strings' })
+      }
+      const result = replaceSqliteAttachments(req.params.projectId, req.params.ticketId, req.body)
+      if (result.error) return reply.status(result.error.statusCode).send({ error: result.error.message })
+      return reply.status(204).send()
+    }
+
     const entry = findRegistryEntry(req.params.projectId)
     if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -305,6 +328,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { projectId: string; ticketId: string } }>(
     '/api/projects/:projectId/tickets/:ticketId/files',
     async (req, reply) => {
+      if (hasSqliteRegistry()) {
+        const result = listSqliteFiles(req.params.projectId, req.params.ticketId)
+        if ('error' in result) return reply.status(result.error.statusCode).send({ error: result.error.message })
+        return reply.send(result.files)
+      }
+
       const entry = findRegistryEntry(req.params.projectId)
       if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -317,6 +346,25 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { projectId: string; ticketId: string } }>(
     '/api/projects/:projectId/tickets/:ticketId/files',
     async (req, reply) => {
+      if (hasSqliteRegistry()) {
+        const file = await req.file()
+        if (!file) return reply.status(400).send({ error: 'No file uploaded' })
+
+        const buffer = await file.toBuffer()
+        const filename = file.filename
+        if (filename.endsWith('.md')) {
+          const writeError = validateSqliteWritableProject(req.params.projectId)
+          if (writeError) return reply.status(writeError.statusCode).send({ error: writeError.message })
+          const wrote = writeDashboardDoc(req.params.projectId, req.params.ticketId, filename, buffer.toString('utf8'))
+          if (!wrote) return reply.status(404).send({ error: 'Document not found' })
+          return reply.status(201).send({ name: filename, type: 'doc' })
+        }
+
+        const result = uploadSqliteFile(req.params.projectId, req.params.ticketId, filename, buffer)
+        if ('error' in result) return reply.status(result.error.statusCode).send({ error: result.error.message })
+        return reply.status(201).send({ name: result.name, type: 'file' })
+      }
+
       const entry = findRegistryEntry(req.params.projectId)
       if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -347,6 +395,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { projectId: string; ticketId: string; filename: string } }>(
     '/api/projects/:projectId/tickets/:ticketId/files/:filename',
     async (req, reply) => {
+      if (hasSqliteRegistry()) {
+        const result = readSqliteFile(req.params.projectId, req.params.ticketId, req.params.filename)
+        if ('error' in result) return reply.status(result.error.statusCode).send({ error: result.error.message })
+        return reply.type(result.mimeType).send(result.buffer)
+      }
+
       const entry = findRegistryEntry(req.params.projectId)
       if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
@@ -363,6 +417,12 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.delete<{ Params: { projectId: string; ticketId: string; filename: string } }>(
     '/api/projects/:projectId/tickets/:ticketId/files/:filename',
     async (req, reply) => {
+      if (hasSqliteRegistry()) {
+        const result = deleteSqliteFile(req.params.projectId, req.params.ticketId, req.params.filename)
+        if (result.error) return reply.status(result.error.statusCode).send({ error: result.error.message })
+        return reply.status(204).send()
+      }
+
       const entry = findRegistryEntry(req.params.projectId)
       if (!entry) return reply.status(404).send({ error: 'Project not found' })
 
