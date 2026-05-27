@@ -4,20 +4,31 @@
 
 # 🗂️ Loci
 
-**Local-first AI ticket management.** Run it in any project, track work with your AI assistant via CLI or MCP.
+**Local-first harness and ticket operations.** Run it in any project, track work with your AI assistant via CLI or MCP.
 
 ## Why Loci?
 
-Loci is a lightweight ticket system that runs entirely on your machine — no cloud, no subscription, no sync issues.
-Your AI coding assistant (Claude, Gemini, Cursor, etc.) can read and update tickets directly via the `loci` CLI or MCP.
+Loci is a lightweight local-first harness system that runs entirely on your machine.
+Your AI coding assistant (Claude, Gemini, Cursor, etc.) can read and update workflow tickets directly via `loci` CLI or MCP.
 
 ## Install
 
-**Requirements:** [Bun](https://bun.sh) ≥ 1.0
+Bootstrap install (transition path):
 
 ```bash
 bun install -g github:thienhm/loci
 ```
+
+Then install/update the managed Rust binary:
+
+```bash
+loci update
+```
+
+Managed binary location:
+
+- macOS/Linux: `~/.loci/bin/loci`
+- Windows: `%USERPROFILE%\.loci\bin\loci.exe`
 
 ## Quick Start
 
@@ -25,10 +36,10 @@ bun install -g github:thienhm/loci
 # In your project directory
 loci init
 
-# Start the server + web UI
+# Optional: start the server + web UI
 loci serve
 
-# Open the web UI in your browser
+# Optional: open the web UI in your browser
 loci open
 ```
 
@@ -38,13 +49,17 @@ The web UI is available at **http://localhost:3333** by default.
 
 ### CLI (Recommended)
 
-Install the Loci skill so your AI agent can use the CLI directly — no server required, lower token usage:
+Use the local CLI directly in your agent workflow. `loci init` generates project instructions and foundation docs:
 
-```bash
-loci skill install
-```
-
-This writes a `LOCI.md` into your project that teaches your AI assistant how to use `loci` CLI commands.
+- `AGENTS.md`
+- `LOCI.md`
+- `loci/project.md`
+- `loci/architecture.md`
+- `loci/validation.md`
+- `loci/guardrails.md`
+- `loci/current-state.md`
+- `loci/glossary.md`
+- `loci/backlog.md`
 
 ### MCP
 
@@ -91,21 +106,22 @@ Loci also exposes an MCP server at `http://localhost:3333/mcp` (requires `loci s
 | Command | Description |
 |---------|-------------|
 | `loci init` | Initialize Loci in the current project |
+| `loci doctor` | Check harness/project health |
 | `loci serve` | Start the MCP server and web UI |
 | `loci open` | Open the web UI in your browser |
-| `loci update` | Pull the latest Loci version |
-| `loci skill install` | Install the AI agent skill into your project |
+| `loci update` | Update the managed Loci tool binary |
+| `loci upgrade` | Upgrade project templates/data |
 
 ### Tickets
 
 | Command | Description |
 |---------|-------------|
-| `loci list [--json]` | List all tickets |
-| `loci add "title" [--priority p1\|p2\|p3] [--json]` | Create a new ticket |
-| `loci get <id> [--json]` | Get a ticket by ID |
+| `loci list [--json]` | List workflow tickets |
+| `loci add "title" [--json]` | Create a workflow ticket |
+| `loci get <id> [--json]` | Get one ticket by ID |
 | `loci status <id> <status> [--json]` | Update ticket status |
 | `loci patch <id> [--assignee] [--progress] [--priority] [--labels] [--json]` | Update ticket fields |
-| `loci sync` | Regenerate LOCI.md and restructure .loci folder |
+| `loci plan`, `loci ready`, `loci validate`, `loci evidence`, `loci trace`, `loci summary`, `loci review` | Harness workflow commands |
 
 ### Docs & Attachments
 
@@ -117,10 +133,10 @@ Loci also exposes an MCP server at `http://localhost:3333/mcp` (requires `loci s
 
 ## How It Works
 
-- Tickets are stored in `.loci/` in your project root (gitignored by default)
-- Each ticket is a directory with a `ticket.json`, `description.md`, and optional docs
-- The CLI reads directly from disk — no server needed for most operations
-- The MCP server and web UI (Kanban board + list view) are served by `loci serve`
+- Project docs live under `loci/` (human/agent-visible context and workflow packets)
+- Operational state lives under `.loci/` (SQLite + local tool state)
+- The CLI is local-first and does not require a running server for core workflows
+- The MCP server and web UI are served by `loci serve`
 
 ## Updating
 
@@ -128,17 +144,22 @@ Loci also exposes an MCP server at `http://localhost:3333/mcp` (requires `loci s
 loci update
 ```
 
-If you're on an older version and `loci update` doesn't pull the latest, bootstrap once manually:
+If you're on an older install and `loci update` cannot run yet, bootstrap once manually:
 
 ```bash
 bun remove -g loci && bun install -g github:thienhm/loci
 ```
 
-After that, `loci update` will always get the latest.
+Then run:
 
-## Migrating from v0.1.x
+```bash
+loci update
+```
 
-See [MIGRATION.md](MIGRATION.md) for the MCP → CLI migration guide.
+## Migration Notes
+
+- `loci sync` has been retired. Use `loci upgrade`.
+- `loci skill` has been retired from product CLI.
 
 ## Contributing
 
