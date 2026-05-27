@@ -13,22 +13,26 @@ Your AI coding assistant (Claude, Gemini, Cursor, etc.) can read and update work
 
 ## Install
 
-Bootstrap install (transition path):
+Recommended one-line install (macOS Apple Silicon + Linux x86_64/aarch64):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thienhm/loci/main/scripts/install.sh | bash
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thienhm/loci/main/scripts/install.sh | bash -s -- v2.0.0
+```
+
+Transition bootstrap (legacy Bun launcher):
 
 ```bash
 bun install -g github:thienhm/loci
-```
-
-Then install/update the managed Rust binary:
-
-```bash
 loci update
 ```
 
-Managed binary location:
-
-- macOS/Linux: `~/.loci/bin/loci`
-- Windows: `%USERPROFILE%\.loci\bin\loci.exe`
+Managed binary location: `~/.loci/bin/loci`
 
 ## Quick Start
 
