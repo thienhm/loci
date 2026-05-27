@@ -260,6 +260,15 @@ pub enum Commands {
         #[command(subcommand)]
         command: DocCommands,
     },
+
+    /// List attachments for a ticket.
+    Attachments {
+        /// Ticket id, for example LCI-001.
+        id: String,
+        /// Emit machine-readable JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1120,5 +1129,6 @@ pub fn run() -> Result<()> {
                 json,
             } => commands::doc::write(&id, &filename, &content, json),
         },
+        Commands::Attachments { id, json } => commands::attachments::run(&id, json),
     }
 }

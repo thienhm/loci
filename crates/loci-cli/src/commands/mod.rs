@@ -1,4 +1,5 @@
 pub mod add;
+pub mod attachments;
 pub mod backlog;
 pub mod decision;
 pub mod doc;

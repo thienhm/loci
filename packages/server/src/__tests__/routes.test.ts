@@ -110,6 +110,20 @@ function seedSqliteRegistryAndProject() {
     )
   `)
   projectDb.run(`
+    CREATE TABLE ticket_file (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticket_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      relative_path TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      source TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(ticket_id, filename)
+    )
+  `)
+  projectDb.run(`
     INSERT INTO project (id, name, prefix, loci_version, created_at, updated_at)
     VALUES ('sqlite-project-uuid', 'SQLite Project', 'SQL', '1.1.0', '2026-05-26T00:00:00Z', '2026-05-26T00:00:00Z')
   `)
@@ -608,6 +622,42 @@ describe('attachments endpoints', () => {
     })
     expect(res.statusCode).toBe(400)
   })
+
+  it('reads attachments from SQLite metadata when registry.db exists', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const filesDir = join(sqliteWorkspace, 'loci', 'tickets', 'SQL-001', 'files')
+    mkdirSync(filesDir, { recursive: true })
+    writeFileSync(join(filesDir, 'design.png'), 'png-data')
+
+    const db = new Database(join(sqliteWorkspace, '.loci', 'loci.db'))
+    db.run(
+      `INSERT INTO ticket_file (ticket_id, filename, relative_path, mime_type, size_bytes, source, created_at, updated_at)
+       VALUES ('SQL-001', 'design.png', 'loci/tickets/SQL-001/files/design.png', 'image/png', 8, 'upload', '2026-05-26T03:00:00Z', '2026-05-26T03:00:00Z')`
+    )
+    db.close()
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/attachments',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json<any[]>()).toEqual(['design.png'])
+  })
+
+  it('imports legacy attachments.json entries for SQLite projects when file exists', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const legacyDir = join(sqliteWorkspace, '.loci', 'tickets', 'SQL-001', 'files')
+    mkdirSync(legacyDir, { recursive: true })
+    writeFileSync(join(legacyDir, 'legacy.pdf'), 'legacy')
+    writeFileSync(join(sqliteWorkspace, '.loci', 'tickets', 'SQL-001', 'attachments.json'), JSON.stringify(['legacy.pdf', 'missing.png']))
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/attachments',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json<any[]>()).toEqual(['legacy.pdf'])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -726,5 +776,54 @@ describe('file upload endpoints', () => {
     })
     expect(docRes.statusCode).toBe(200)
     expect(docRes.body).toContain('# My Notes')
+  })
+
+  it('uses SQLite metadata + unique filename handling for SQLite projects', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const sqliteFilesDir = join(sqliteWorkspace, 'loci', 'tickets', 'SQL-001', 'files')
+    mkdirSync(sqliteFilesDir, { recursive: true })
+    writeFileSync(join(sqliteFilesDir, 'report.pdf'), 'existing')
+    const db = new Database(join(sqliteWorkspace, '.loci', 'loci.db'))
+    db.run(
+      `INSERT INTO ticket_file (ticket_id, filename, relative_path, mime_type, size_bytes, source, created_at, updated_at)
+       VALUES ('SQL-001', 'report.pdf', 'loci/tickets/SQL-001/files/report.pdf', 'application/pdf', 8, 'upload', '2026-05-26T03:00:00Z', '2026-05-26T03:00:00Z')`
+    )
+    db.close()
+
+    const { body, boundary } = multipartBody('report.pdf', 'application/pdf', 'new-content')
+    const upload = await app.inject({
+      method: 'POST',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/files',
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    })
+    expect(upload.statusCode).toBe(201)
+    expect(upload.json<any>().name).toBe('report(1).pdf')
+
+    const list = await app.inject({ method: 'GET', url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/files' })
+    expect(list.statusCode).toBe(200)
+    expect(list.json<any[]>().map((file) => file.name)).toEqual(['report(1).pdf', 'report.pdf'])
+  })
+
+  it('returns 404 for missing SQLite file records and missing disk file', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/files/nope.txt',
+    })
+    expect(missing.statusCode).toBe(404)
+
+    const db = new Database(join(sqliteWorkspace, '.loci', 'loci.db'))
+    db.run(
+      `INSERT INTO ticket_file (ticket_id, filename, relative_path, mime_type, size_bytes, source, created_at, updated_at)
+       VALUES ('SQL-001', 'ghost.txt', 'loci/tickets/SQL-001/files/ghost.txt', 'text/plain', 5, 'upload', '2026-05-26T03:00:00Z', '2026-05-26T03:00:00Z')`
+    )
+    db.close()
+
+    const ghost = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/files/ghost.txt',
+    })
+    expect(ghost.statusCode).toBe(404)
   })
 })
