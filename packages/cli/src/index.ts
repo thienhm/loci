@@ -1,38 +1,62 @@
 #!/usr/bin/env bun
 import { Command } from 'commander'
-import { initCommand } from './commands/init'
-import { addCommand } from './commands/add'
-import { listCommand } from './commands/list'
-import { statusCommand } from './commands/status'
-import { serveCommand } from './commands/serve'
-import { openCommand } from './commands/open'
-import { updateCommand } from './commands/update'
-import { syncCommand } from './commands/sync'
-import { getCommand } from './commands/get'
-import { patchCommand } from './commands/patch'
-import { docCommand } from './commands/doc'
-import { attachmentsCommand } from './commands/attachments'
-import { skillCommand } from './commands/skill'
+import { executeBridge } from './bridge'
 
-const program = new Command()
+async function runTypeScriptCli() {
+  const [
+    { initCommand },
+    { addCommand },
+    { listCommand },
+    { statusCommand },
+    { serveCommand },
+    { openCommand },
+    { updateCommand },
+    { syncCommand },
+    { getCommand },
+    { patchCommand },
+    { docCommand },
+    { attachmentsCommand },
+    { skillCommand },
+  ] = await Promise.all([
+    import('./commands/init'),
+    import('./commands/add'),
+    import('./commands/list'),
+    import('./commands/status'),
+    import('./commands/serve'),
+    import('./commands/open'),
+    import('./commands/update'),
+    import('./commands/sync'),
+    import('./commands/get'),
+    import('./commands/patch'),
+    import('./commands/doc'),
+    import('./commands/attachments'),
+    import('./commands/skill'),
+  ])
 
-program
-  .name('loci')
-  .description('Local ticket management tool')
-  .version('1.0.2')
+  const program = new Command()
 
-program.addCommand(initCommand)
-program.addCommand(addCommand)
-program.addCommand(listCommand)
-program.addCommand(statusCommand)
-program.addCommand(serveCommand)
-program.addCommand(openCommand)
-program.addCommand(updateCommand)
-program.addCommand(syncCommand)
-program.addCommand(getCommand)
-program.addCommand(patchCommand)
-program.addCommand(docCommand)
-program.addCommand(attachmentsCommand)
-program.addCommand(skillCommand)
+  program
+    .name('loci')
+    .description('Local ticket management tool')
+    .version('1.0.2')
 
-program.parse()
+  program.addCommand(initCommand)
+  program.addCommand(addCommand)
+  program.addCommand(listCommand)
+  program.addCommand(statusCommand)
+  program.addCommand(serveCommand)
+  program.addCommand(openCommand)
+  program.addCommand(updateCommand)
+  program.addCommand(syncCommand)
+  program.addCommand(getCommand)
+  program.addCommand(patchCommand)
+  program.addCommand(docCommand)
+  program.addCommand(attachmentsCommand)
+  program.addCommand(skillCommand)
+
+  program.parse()
+}
+
+if (!executeBridge(process.argv.slice(2))) {
+  await runTypeScriptCli()
+}
