@@ -40,6 +40,36 @@ describe('TypeScript to Rust CLI bridge', () => {
     expect(action.warning).toContain('TypeScript compatibility fallback')
   })
 
+  it('delegates ported status and patch commands to the managed Rust binary', () => {
+    for (const args of [
+      ['status', 'LCI-001', 'in_review'],
+      ['patch', 'LCI-001', '--assignee', 'agent:codex'],
+    ]) {
+      const action = planBridge(args, {
+        env: { HOME: '/tmp/loci-home' },
+        binaryExists: () => true,
+      })
+
+      expect(action).toEqual({
+        kind: 'delegate',
+        binaryPath: join('/tmp/loci-home', '.loci', 'bin', 'loci'),
+        args,
+      })
+    }
+  })
+
+  it('keeps unresolved compatibility commands as TypeScript fallbacks', () => {
+    for (const command of ['serve', 'open', 'doc', 'attachments', 'sync', 'skill']) {
+      const action = planBridge([command, '--help'], {
+        env: { HOME: '/tmp/loci-home' },
+        binaryExists: () => false,
+      })
+
+      expect(action.kind).toBe('typescript')
+      expect(action.commandName).toBe(command)
+    }
+  })
+
   it('returns actionable guidance when Rust-primary commands cannot find the managed binary', () => {
     const action = planBridge(['get', 'LCI-001'], {
       env: { HOME: '/tmp/loci-home' },
@@ -75,6 +105,28 @@ describe('TypeScript to Rust CLI bridge', () => {
 
     expect(action.kind).toBe('typescript')
     expect(inspected).toBe(false)
+  })
+
+  it('retires sync with migration guidance instead of keeping a TypeScript fallback', () => {
+    const action = planBridge(['sync'], {
+      env: { HOME: '/tmp/loci-home' },
+      binaryExists: () => true,
+    })
+
+    expect(action.kind).toBe('retired')
+    expect(action.commandName).toBe('sync')
+    expect(action.message).toContain('loci upgrade')
+  })
+
+  it('retires skill with agent-tooling guidance instead of keeping a TypeScript fallback', () => {
+    const action = planBridge(['skill', 'install'], {
+      env: { HOME: '/tmp/loci-home' },
+      binaryExists: () => true,
+    })
+
+    expect(action.kind).toBe('retired')
+    expect(action.commandName).toBe('skill')
+    expect(action.message).toContain('agent tooling')
   })
 
   it('resolves the managed binary path under the user home', () => {
