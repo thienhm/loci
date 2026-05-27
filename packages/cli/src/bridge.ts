@@ -5,6 +5,7 @@ import { join, win32 } from 'path'
 export type BridgeAction =
   | { kind: 'delegate'; binaryPath: string; args: string[] }
   | { kind: 'typescript'; commandName: string | undefined; warning: string }
+  | { kind: 'retired'; commandName: string; message: string }
   | { kind: 'missing-rust-binary'; commandName: string; binaryPath: string; message: string }
 
 type BridgeOptions = {
@@ -40,9 +41,9 @@ export const typescriptFallbackCommands = new Set([
   'patch',
   'doc',
   'attachments',
-  'sync',
-  'skill',
 ])
+
+export const retiredCommands = new Set(['sync', 'skill'])
 
 export function managedRustBinaryPath(options: BridgeOptions = {}): string {
   const platform = options.platform ?? process.platform
@@ -71,6 +72,14 @@ export function decideBridgeAction(args: string[], options: BridgeOptions = {}):
       kind: 'typescript',
       commandName: command,
       warning: `Using TypeScript compatibility fallback for "loci ${command}".`,
+    }
+  }
+
+  if (command && retiredCommands.has(command)) {
+    return {
+      kind: 'retired',
+      commandName: command,
+      message: buildRetiredCommandMessage(command),
     }
   }
 
@@ -107,6 +116,24 @@ export function decideBridgeAction(args: string[], options: BridgeOptions = {}):
   }
 }
 
+export function buildRetiredCommandMessage(command: string): string {
+  if (command === 'sync') {
+    return [
+      '`loci sync` has been retired during the Rust CLI cutover.',
+      'Use `loci upgrade` for project template/doc upgrades and archived ticket layout migration.',
+    ].join('\n')
+  }
+
+  if (command === 'skill') {
+    return [
+      '`loci skill` has been retired from the product CLI.',
+      'Install or update Codex/Claude skills through your agent tooling or copy `skills/loci/SKILL.md` manually.',
+    ].join('\n')
+  }
+
+  return `\`loci ${command}\` has been retired.`
+}
+
 export function planBridge(args: string[], options: BridgeOptions = {}): BridgeAction {
   return decideBridgeAction(args, options)
 }
@@ -140,6 +167,11 @@ export function executeBridge(args: string[]): boolean {
   }
 
   if (action.kind === 'missing-rust-binary') {
+    console.error(action.message)
+    process.exit(1)
+  }
+
+  if (action.kind === 'retired') {
     console.error(action.message)
     process.exit(1)
   }
