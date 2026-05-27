@@ -15,6 +15,7 @@ use crate::evidence;
 use crate::packet;
 use crate::paths::find_workspace_root;
 use crate::project;
+use crate::registry;
 use crate::templates;
 use crate::validation;
 
@@ -147,6 +148,7 @@ pub fn run(id: &str, should_run: bool, json: bool) -> Result<()> {
     }
 
     let validation_state = if any_failed { "failing" } else { "passing" };
+    registry::refresh_registered_project_counts(&root)?;
     let response = ValidationRunResponse {
         ok: !any_failed,
         ticket_id: id.to_string(),

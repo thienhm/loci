@@ -3,6 +3,7 @@ use anyhow::{anyhow, bail, Result};
 use crate::db::connect_project_db;
 use crate::paths::find_workspace_root;
 use crate::project;
+use crate::registry;
 
 pub fn run(id: &str, status: &str, json: bool) -> Result<()> {
     let normalized = normalize_status(status)?;
@@ -21,6 +22,7 @@ pub fn run(id: &str, status: &str, json: bool) -> Result<()> {
         &ticket.labels,
         ticket.progress,
     )?;
+    registry::refresh_registered_project_counts(&root)?;
 
     let updated =
         project::get_ticket(&conn, id)?.ok_or_else(|| anyhow!("ticket {id} not found"))?;
