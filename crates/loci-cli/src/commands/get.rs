@@ -1,0 +1,70 @@
+use std::collections::BTreeMap;
+use std::path::Path;
+
+use anyhow::Result;
+
+use crate::db::connect_project_db;
+use crate::domain::{TicketRecord, TicketWithDocs};
+use crate::paths::find_workspace_root;
+use crate::project;
+
+pub fn run(id: &str, json: bool) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    let root =
+        find_workspace_root(&cwd).ok_or_else(|| anyhow::anyhow!("not inside a Loci workspace"))?;
+    let conn = connect_project_db(&root.join(".loci/loci.db"))?;
+    let ticket =
+        project::get_ticket(&conn, id)?.ok_or_else(|| anyhow::anyhow!("ticket {id} not found"))?;
+    let ticket_with_docs = TicketWithDocs {
+        docs: read_docs(&root, &ticket)?,
+        ticket,
+    };
+
+    if json {
+        println!("{}", serde_json::to_string(&ticket_with_docs)?);
+    } else {
+        println!(
+            "{} [{}] {}",
+            ticket_with_docs.ticket.id,
+            ticket_with_docs.ticket.status,
+            ticket_with_docs.ticket.title
+        );
+        for (filename, content) in &ticket_with_docs.docs {
+            println!("\n--- {filename} ---\n{content}");
+        }
+    }
+
+    Ok(())
+}
+
+fn read_docs(root: &Path, ticket: &TicketRecord) -> Result<BTreeMap<String, String>> {
+    let mut docs = BTreeMap::new();
+
+    for path in doc_paths(ticket) {
+        let absolute_path = root.join(path);
+        if absolute_path.is_file() {
+            let filename = absolute_path
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+                .unwrap_or_else(|| path.to_string());
+            docs.insert(filename, std::fs::read_to_string(absolute_path)?);
+        }
+    }
+
+    Ok(docs)
+}
+
+fn doc_paths(ticket: &TicketRecord) -> impl Iterator<Item = &str> {
+    [
+        ticket.story_path.as_deref(),
+        ticket.design_path.as_deref(),
+        ticket.plan_path.as_deref(),
+        ticket.validation_path.as_deref(),
+        ticket.evidence_path.as_deref(),
+        ticket.summary_path.as_deref(),
+        ticket.lessons_path.as_deref(),
+        ticket.harness_delta_path.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+}

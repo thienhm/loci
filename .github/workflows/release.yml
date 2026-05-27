@@ -6,7 +6,82 @@ on:
       - 'v*'
 
 jobs:
+  build-rust-artifacts:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            binary: target/aarch64-apple-darwin/release/loci
+          - os: macos-13
+            target: x86_64-apple-darwin
+            binary: target/x86_64-apple-darwin/release/loci
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary: target/x86_64-unknown-linux-gnu/release/loci
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            binary: target/aarch64-unknown-linux-gnu/release/loci
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: target/x86_64-pc-windows-msvc/release/loci.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build Rust CLI
+        run: cargo build -p loci-cli --release --locked --target ${{ matrix.target }}
+
+      - name: Run Rust CLI tests
+        run: cargo test -p loci-cli --locked --target ${{ matrix.target }}
+
+      - name: Smoke-test release binary
+        shell: bash
+        run: ./${{ matrix.binary }} --help
+
+      - name: Package release artifact
+        shell: bash
+        run: >
+          scripts/package-rust-cli.sh
+          --target ${{ matrix.target }}
+          --binary ${{ matrix.binary }}
+          --out-dir dist/${{ matrix.target }}
+
+      - name: Smoke-test packaged artifact
+        shell: bash
+        run: |
+          mkdir -p dist/smoke
+          case "${{ matrix.target }}" in
+            *windows* | *-msvc)
+              7z x "dist/${{ matrix.target }}/loci-${{ matrix.target }}.zip" -odist/smoke >/dev/null
+              dist/smoke/loci/loci.exe --help
+              ;;
+            *)
+              tar -C dist/smoke -xzf "dist/${{ matrix.target }}/loci-${{ matrix.target }}.tar.gz"
+              dist/smoke/loci/loci --help
+              ;;
+          esac
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: loci-${{ matrix.target }}
+          path: |
+            dist/${{ matrix.target }}/loci-${{ matrix.target }}.*
+            dist/${{ matrix.target }}/loci-SHA256SUMS.txt
+
   release:
+    needs: build-rust-artifacts
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -16,11 +91,22 @@ jobs:
         with:
           fetch-depth: 0 # Fetch all history for changelog generation
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
         with:
-          bun-version: latest
-          
+          pattern: loci-*
+          path: dist/release
+
+      - name: Assemble checksum manifest
+        run: |
+          mkdir -p dist/assets
+          find dist/release -type f \( -name 'loci-*.tar.gz' -o -name 'loci-*.zip' \) \
+            -exec cp {} dist/assets/ \;
+          (
+            cd dist/assets
+            sha256sum loci-*.tar.gz loci-*.zip | sort -k 2 > loci-SHA256SUMS.txt
+          )
+
       - name: Generate Release Notes
         id: changelog
         run: |
@@ -42,3 +128,10 @@ jobs:
         with:
           body: ${{ steps.changelog.outputs.notes }}
           generate_release_notes: true
+          files: |
+            dist/assets/loci-aarch64-apple-darwin.tar.gz
+            dist/assets/loci-x86_64-apple-darwin.tar.gz
+            dist/assets/loci-x86_64-unknown-linux-gnu.tar.gz
+            dist/assets/loci-aarch64-unknown-linux-gnu.tar.gz
+            dist/assets/loci-x86_64-pc-windows-msvc.zip
+            dist/assets/loci-SHA256SUMS.txt

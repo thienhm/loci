@@ -1,0 +1,21 @@
+pub mod app;
+pub mod backlog;
+pub mod commands;
+pub mod db;
+pub mod decision;
+pub mod domain;
+pub mod evidence;
+pub mod migrations;
+pub mod packet;
+pub mod paths;
+pub mod project;
+pub mod readiness;
+pub mod registry;
+pub mod review;
+pub mod templates;
+pub mod trace;
+pub mod update;
+pub mod upgrade;
+pub mod validation;
+
+pub use app::run;

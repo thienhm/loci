@@ -42,13 +42,20 @@ import type { Project, Ticket, TicketStatus, TicketPriority } from '../types'
 type ViewMode = 'kanban' | 'list'
 type SortField = 'id' | 'title' | 'status' | 'priority' | 'updatedAt'
 type SortDir = 'asc' | 'desc'
+type BoardStatus = Exclude<TicketStatus, 'todo'>
 
-const COLUMNS: { id: TicketStatus; label: string }[] = [
-  { id: 'todo', label: 'Todo' },
+const COLUMNS: { id: BoardStatus; label: string }[] = [
+  { id: 'idea', label: 'Idea' },
+  { id: 'shaped', label: 'Shaped' },
+  { id: 'ready', label: 'Ready' },
   { id: 'in_progress', label: 'In Progress' },
   { id: 'in_review', label: 'In Review' },
   { id: 'done', label: 'Done' },
 ]
+
+function boardStatus(status: TicketStatus): BoardStatus {
+  return status === 'todo' ? 'idea' : status
+}
 
 function getStoredViewMode(projectId: string | undefined): ViewMode {
   if (!projectId) return 'kanban'
@@ -64,7 +71,7 @@ export function ProjectBoardPage() {
   const queryClient = useQueryClient()
   const [viewMode, setViewModeState] = useState<ViewMode>(() => getStoredViewMode(projectId))
   const [activeTicket, setActiveTicket] = useState<Ticket | null>(null)
-  const [overColumnId, setOverColumnId] = useState<TicketStatus | null>(null)
+  const [overColumnId, setOverColumnId] = useState<BoardStatus | null>(null)
   const [showNewTicket, setShowNewTicket] = useState(false)
   const [newTicketTitle, setNewTicketTitle] = useState('')
   const [sortField, setSortField] = useState<SortField>('updatedAt')
@@ -165,7 +172,7 @@ export function ProjectBoardPage() {
     const col = COLUMNS.find((c) => c.id === over.id)
     if (col) { setOverColumnId(col.id); return }
     const overTicket = filteredTickets.find((t) => t.id === over.id)
-    if (overTicket) { setOverColumnId(overTicket.status); return }
+    if (overTicket) { setOverColumnId(boardStatus(overTicket.status)); return }
     setOverColumnId(null)
   }
 
@@ -178,11 +185,11 @@ export function ProjectBoardPage() {
     let targetStatus = COLUMNS.find((c) => c.id === over.id)?.id
     if (!targetStatus) {
       const overTicket = filteredTickets.find((t) => t.id === over.id)
-      if (overTicket) targetStatus = overTicket.status
+      if (overTicket) targetStatus = boardStatus(overTicket.status)
     }
     if (targetStatus) {
       const ticket = filteredTickets.find((t) => t.id === active.id)
-      if (ticket && ticket.status !== targetStatus) {
+      if (ticket && boardStatus(ticket.status) !== targetStatus) {
         updateMutation.mutate({ ticketId: String(active.id), status: targetStatus })
       }
     }
@@ -349,7 +356,7 @@ export function ProjectBoardPage() {
           <div style={styles.kanban}>
             {COLUMNS.map((col) => {
               const colTickets = filteredTickets
-                .filter((t) => t.status === col.id)
+                .filter((t) => boardStatus(t.status) === col.id)
                 .sort((a, b) => {
                   const aArch = a.archived ? 1 : 0
                   const bArch = b.archived ? 1 : 0
@@ -431,7 +438,7 @@ function KanbanColumn({
   selectedTickets,
   onToggleSelect,
 }: {
-  column: { id: TicketStatus; label: string }
+  column: { id: BoardStatus; label: string }
   tickets: Ticket[]
   projectId: string
   isHighlighted: boolean
@@ -762,12 +769,18 @@ function TicketTable({
 
 const statusColors: Record<TicketStatus, string> = {
   todo: '#94A3B8',
+  idea: '#94A3B8',
+  shaped: '#8B5CF6',
+  ready: '#14B8A6',
   in_progress: '#3B82F6',
   in_review: '#F59E0B',
   done: '#22C55E',
 }
 const statusLabels: Record<TicketStatus, string> = {
   todo: 'Todo',
+  idea: 'Idea',
+  shaped: 'Shaped',
+  ready: 'Ready',
   in_progress: 'In Progress',
   in_review: 'In Review',
   done: 'Done',

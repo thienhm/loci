@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'bun:test'
+import { Database } from 'bun:sqlite'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
@@ -38,6 +39,127 @@ function seedTicket(id: string, overrides: Partial<Ticket> = {}) {
   writeFileSync(join(dir, 'description.md'), `# ${ticket.title}\n\n`)
   writeFileSync(join(dir, 'attachments.json'), JSON.stringify([], null, 2))
   return ticket
+}
+
+function seedSqliteRegistryAndProject() {
+  const sqliteWorkspace = mkdtempSync(join(tmpdir(), 'loci-routes-sqlite-ws-'))
+  mkdirSync(join(tmpHome, '.loci'), { recursive: true })
+  const registry = new Database(join(tmpHome, '.loci', 'registry.db'))
+  registry.run(`
+    CREATE TABLE registered_project (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      prefix TEXT NOT NULL,
+      path TEXT NOT NULL UNIQUE,
+      loci_version TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      last_indexed_at TEXT,
+      health_status TEXT NOT NULL DEFAULT 'warning',
+      open_ticket_count INTEGER NOT NULL DEFAULT 0,
+      review_ticket_count INTEGER NOT NULL DEFAULT 0,
+      validation_failure_count INTEGER NOT NULL DEFAULT 0
+    )
+  `)
+  registry.run(`
+    INSERT INTO registered_project (
+      id, name, prefix, path, loci_version, last_seen_at, last_indexed_at,
+      health_status, open_ticket_count, review_ticket_count, validation_failure_count
+    )
+    VALUES (
+      'sqlite-project-uuid', 'SQLite Project', 'SQL', ?, '1.1.0',
+      '2026-05-26T00:00:00Z', NULL, 'healthy', 10, 5, 3
+    )
+  `, [sqliteWorkspace])
+  registry.close()
+
+  mkdirSync(join(sqliteWorkspace, '.loci'), { recursive: true })
+  const projectDb = new Database(join(sqliteWorkspace, '.loci', 'loci.db'))
+  projectDb.run(`
+    CREATE TABLE project (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      prefix TEXT NOT NULL,
+      loci_version TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `)
+  projectDb.run(`
+    CREATE TABLE ticket (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL,
+      priority TEXT NOT NULL,
+      assignee TEXT,
+      labels_json TEXT NOT NULL DEFAULT '[]',
+      progress INTEGER NOT NULL DEFAULT 0,
+      risk_lane TEXT NOT NULL DEFAULT 'normal',
+      readiness_state TEXT NOT NULL DEFAULT 'missing',
+      validation_state TEXT NOT NULL DEFAULT 'missing',
+      review_state TEXT NOT NULL DEFAULT 'not_ready',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      story_path TEXT,
+      design_path TEXT,
+      plan_path TEXT,
+      validation_path TEXT,
+      evidence_path TEXT,
+      summary_path TEXT,
+      lessons_path TEXT,
+      harness_delta_path TEXT
+    )
+  `)
+  projectDb.run(`
+    CREATE TABLE ticket_file (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ticket_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      relative_path TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      source TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(ticket_id, filename)
+    )
+  `)
+  projectDb.run(`
+    INSERT INTO project (id, name, prefix, loci_version, created_at, updated_at)
+    VALUES ('sqlite-project-uuid', 'SQLite Project', 'SQL', '1.1.0', '2026-05-26T00:00:00Z', '2026-05-26T00:00:00Z')
+  `)
+  projectDb.run(`
+    INSERT INTO ticket (
+      id, title, status, priority, labels_json, progress, risk_lane,
+      readiness_state, validation_state, review_state, created_at, updated_at,
+      story_path, validation_path
+    )
+    VALUES (
+      'SQL-001', 'SQLite ticket', 'ready', 'high', '["sqlite"]', 40, 'high_risk',
+      'ready', 'failing', 'not_ready', '2026-05-26T01:00:00Z', '2026-05-26T02:00:00Z',
+      'loci/tickets/SQL-001/story.md', 'loci/tickets/SQL-001/validation.md'
+    )
+  `)
+  projectDb.close()
+
+  mkdirSync(join(sqliteWorkspace, 'loci', 'tickets', 'SQL-001'), { recursive: true })
+  writeFileSync(join(sqliteWorkspace, 'loci', 'tickets', 'SQL-001', 'story.md'), '# Story\n\nSQLite ticket body.')
+  writeFileSync(join(sqliteWorkspace, 'loci', 'tickets', 'SQL-001', 'validation.md'), '# Validation\n\nFailing.')
+  return sqliteWorkspace
+}
+
+function readRegistrySummary(projectId: string) {
+  const registry = new Database(join(tmpHome, '.loci', 'registry.db'))
+  try {
+    return registry
+      .query<{ open_ticket_count: number; review_ticket_count: number; validation_failure_count: number }, [string]>(
+        `SELECT open_ticket_count, review_ticket_count, validation_failure_count
+         FROM registered_project
+         WHERE id = ?1`
+      )
+      .get(projectId)
+  } finally {
+    registry.close()
+  }
 }
 
 async function buildApp() {
@@ -97,6 +219,27 @@ describe('GET /api/projects', () => {
     expect(body).toHaveLength(1)
     expect(body[0].prefix).toBe(PROJECT_PREFIX)
   })
+
+  it('prefers SQLite registry projects when registry.db exists', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+
+    const res = await app.inject({ method: 'GET', url: '/api/projects' })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json<any[]>()
+    expect(body).toHaveLength(1)
+    expect(body[0]).toMatchObject({
+      id: 'sqlite-project-uuid',
+      name: 'SQLite Project',
+      prefix: 'SQL',
+      path: sqliteWorkspace,
+      available: true,
+      healthStatus: 'healthy',
+      openTicketCount: 1,
+      reviewTicketCount: 0,
+      validationFailureCount: 1,
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -151,6 +294,23 @@ describe('GET /api/projects/:projectId/tickets', () => {
     const res = await app.inject({ method: 'GET', url: '/api/projects/bad/tickets' })
     expect(res.statusCode).toBe(404)
   })
+
+  it('returns tickets from SQLite project databases', async () => {
+    seedSqliteRegistryAndProject()
+
+    const res = await app.inject({ method: 'GET', url: '/api/projects/sqlite-project-uuid/tickets' })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json<any[]>()
+    expect(body).toHaveLength(1)
+    expect(body[0]).toMatchObject({
+      id: 'SQL-001',
+      title: 'SQLite ticket',
+      status: 'ready',
+      riskLane: 'high_risk',
+      validationState: 'failing',
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -200,6 +360,32 @@ describe('POST /api/projects/:projectId/tickets', () => {
     })
     expect(second.json<any>().id).toBe('TST-002')
   })
+
+  it('creates SQLite ticket rows when registry.db exists', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/projects/sqlite-project-uuid/tickets',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'SQLite created ticket', priority: 'low', labels: ['ops'] }),
+    })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json<any>()
+    expect(body.id).toBe('SQL-002')
+    expect(body.status).toBe('idea')
+    expect(body.priority).toBe('low')
+    expect(body.labels).toEqual(['ops'])
+    expect(existsSync(join(sqliteWorkspace, '.loci', 'tickets', 'SQL-002', 'ticket.json'))).toBe(false)
+    expect(existsSync(join(sqliteWorkspace, 'loci', 'tickets', 'SQL-002', 'story.md'))).toBe(true)
+
+    expect(readRegistrySummary('sqlite-project-uuid')).toEqual({
+      open_ticket_count: 2,
+      review_ticket_count: 0,
+      validation_failure_count: 1,
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -220,6 +406,21 @@ describe('GET /api/projects/:projectId/tickets/:ticketId', () => {
   it('returns 404 for unknown ticket', async () => {
     const res = await app.inject({ method: 'GET', url: `/api/projects/${PROJECT_ID}/tickets/TST-999` })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('returns SQLite ticket docs from visible loci paths', async () => {
+    seedSqliteRegistryAndProject()
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001',
+    })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json<any>()
+    expect(body.id).toBe('SQL-001')
+    expect(body.docs['story.md']).toBe('# Story\n\nSQLite ticket body.')
+    expect(body.docs['validation.md']).toBe('# Validation\n\nFailing.')
   })
 })
 
@@ -264,6 +465,46 @@ describe('PATCH /api/projects/:projectId/tickets/:ticketId', () => {
       body: JSON.stringify({ status: 'done' }),
     })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('patches SQLite tickets and updates updatedAt', async () => {
+    seedSqliteRegistryAndProject()
+    const before = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001',
+    })
+    const beforeBody = before.json<any>()
+
+    const patch = await app.inject({
+      method: 'PATCH',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'todo', progress: 75, labels: ['cutover'] }),
+    })
+    expect(patch.statusCode).toBe(200)
+    const patched = patch.json<any>()
+    expect(patched.status).toBe('idea')
+    expect(patched.progress).toBe(75)
+    expect(patched.labels).toEqual(['cutover'])
+    expect(patched.updatedAt).not.toBe(beforeBody.updatedAt)
+
+    expect(readRegistrySummary('sqlite-project-uuid')).toEqual({
+      open_ticket_count: 1,
+      review_ticket_count: 0,
+      validation_failure_count: 1,
+    })
+  })
+
+  it('rejects invalid SQLite patch payloads', async () => {
+    seedSqliteRegistryAndProject()
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ progress: 101 }),
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.json<any>().error).toContain('Invalid progress')
   })
 })
 
@@ -318,6 +559,54 @@ describe('docs endpoints', () => {
     })
     expect(res.statusCode).toBe(400)
   })
+
+  it('GET returns SQLite ticket docs from visible loci paths', async () => {
+    seedSqliteRegistryAndProject()
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/docs/story.md',
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toBe('# Story\n\nSQLite ticket body.')
+  })
+
+  it('PUT writes SQLite ticket docs through existing Markdown endpoint', async () => {
+    seedSqliteRegistryAndProject()
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/docs/story.md',
+      headers: { 'content-type': 'text/plain' },
+      body: '# Story\n\nUpdated body.',
+    })
+    expect(put.statusCode).toBe(204)
+
+    const get = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/docs/story.md',
+    })
+    expect(get.body).toBe('# Story\n\nUpdated body.')
+  })
+
+  it('PUT fails for unhealthy SQLite projects', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const registry = new Database(join(tmpHome, '.loci', 'registry.db'))
+    registry.run(`UPDATE registered_project SET health_status = 'warning' WHERE id = 'sqlite-project-uuid'`)
+    registry.close()
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/docs/story.md',
+      headers: { 'content-type': 'text/plain' },
+      body: '# Story\n\nShould fail.',
+    })
+    expect(put.statusCode).toBe(409)
+    expect(put.json<any>().error).toContain('not writable')
+
+    expect(readFileSync(join(sqliteWorkspace, 'loci', 'tickets', 'SQL-001', 'story.md'), 'utf8')).toBe('# Story\n\nSQLite ticket body.')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -359,6 +648,42 @@ describe('attachments endpoints', () => {
       body: JSON.stringify({ bad: true }),
     })
     expect(res.statusCode).toBe(400)
+  })
+
+  it('reads attachments from SQLite metadata when registry.db exists', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const filesDir = join(sqliteWorkspace, 'loci', 'tickets', 'SQL-001', 'files')
+    mkdirSync(filesDir, { recursive: true })
+    writeFileSync(join(filesDir, 'design.png'), 'png-data')
+
+    const db = new Database(join(sqliteWorkspace, '.loci', 'loci.db'))
+    db.run(
+      `INSERT INTO ticket_file (ticket_id, filename, relative_path, mime_type, size_bytes, source, created_at, updated_at)
+       VALUES ('SQL-001', 'design.png', 'loci/tickets/SQL-001/files/design.png', 'image/png', 8, 'upload', '2026-05-26T03:00:00Z', '2026-05-26T03:00:00Z')`
+    )
+    db.close()
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/attachments',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json<any[]>()).toEqual(['design.png'])
+  })
+
+  it('imports legacy attachments.json entries for SQLite projects when file exists', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const legacyDir = join(sqliteWorkspace, '.loci', 'tickets', 'SQL-001', 'files')
+    mkdirSync(legacyDir, { recursive: true })
+    writeFileSync(join(legacyDir, 'legacy.pdf'), 'legacy')
+    writeFileSync(join(sqliteWorkspace, '.loci', 'tickets', 'SQL-001', 'attachments.json'), JSON.stringify(['legacy.pdf', 'missing.png']))
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/attachments',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json<any[]>()).toEqual(['legacy.pdf'])
   })
 })
 
@@ -478,5 +803,54 @@ describe('file upload endpoints', () => {
     })
     expect(docRes.statusCode).toBe(200)
     expect(docRes.body).toContain('# My Notes')
+  })
+
+  it('uses SQLite metadata + unique filename handling for SQLite projects', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const sqliteFilesDir = join(sqliteWorkspace, 'loci', 'tickets', 'SQL-001', 'files')
+    mkdirSync(sqliteFilesDir, { recursive: true })
+    writeFileSync(join(sqliteFilesDir, 'report.pdf'), 'existing')
+    const db = new Database(join(sqliteWorkspace, '.loci', 'loci.db'))
+    db.run(
+      `INSERT INTO ticket_file (ticket_id, filename, relative_path, mime_type, size_bytes, source, created_at, updated_at)
+       VALUES ('SQL-001', 'report.pdf', 'loci/tickets/SQL-001/files/report.pdf', 'application/pdf', 8, 'upload', '2026-05-26T03:00:00Z', '2026-05-26T03:00:00Z')`
+    )
+    db.close()
+
+    const { body, boundary } = multipartBody('report.pdf', 'application/pdf', 'new-content')
+    const upload = await app.inject({
+      method: 'POST',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/files',
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+      body,
+    })
+    expect(upload.statusCode).toBe(201)
+    expect(upload.json<any>().name).toBe('report(1).pdf')
+
+    const list = await app.inject({ method: 'GET', url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/files' })
+    expect(list.statusCode).toBe(200)
+    expect(list.json<any[]>().map((file) => file.name)).toEqual(['report(1).pdf', 'report.pdf'])
+  })
+
+  it('returns 404 for missing SQLite file records and missing disk file', async () => {
+    const sqliteWorkspace = seedSqliteRegistryAndProject()
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/files/nope.txt',
+    })
+    expect(missing.statusCode).toBe(404)
+
+    const db = new Database(join(sqliteWorkspace, '.loci', 'loci.db'))
+    db.run(
+      `INSERT INTO ticket_file (ticket_id, filename, relative_path, mime_type, size_bytes, source, created_at, updated_at)
+       VALUES ('SQL-001', 'ghost.txt', 'loci/tickets/SQL-001/files/ghost.txt', 'text/plain', 5, 'upload', '2026-05-26T03:00:00Z', '2026-05-26T03:00:00Z')`
+    )
+    db.close()
+
+    const ghost = await app.inject({
+      method: 'GET',
+      url: '/api/projects/sqlite-project-uuid/tickets/SQL-001/files/ghost.txt',
+    })
+    expect(ghost.statusCode).toBe(404)
   })
 })

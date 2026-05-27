@@ -85,6 +85,7 @@ export function AppShell({ children }: AppShellProps) {
                 icon={<FolderKanban size={15} />}
                 label={p.name}
                 badge={p.prefix}
+                health={p.healthStatus}
                 active={projectId === p.id}
               />
             ))}
@@ -149,14 +150,23 @@ function SidebarLink({
   icon,
   label,
   badge,
+  health,
   active,
 }: {
   to: string
   icon: ReactNode
   label: string
   badge?: string
+  health?: string
   active: boolean
 }) {
+  const healthColor =
+    health === 'missing' || health === 'error'
+      ? 'var(--color-error)'
+      : health === 'warning'
+        ? '#8a5a00'
+        : 'var(--color-primary)'
+
   return (
     <Link
       to={to}
@@ -201,6 +211,19 @@ function SidebarLink({
         >
           {badge}
         </span>
+      )}
+      {health && (
+        <span
+          aria-label={`Project health: ${health}`}
+          title={`Project health: ${health}`}
+          style={{
+            width: '7px',
+            height: '7px',
+            borderRadius: '50%',
+            background: healthColor,
+            flexShrink: 0,
+          }}
+        />
       )}
     </Link>
   )
