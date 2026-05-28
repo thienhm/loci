@@ -79,6 +79,10 @@ export function decideBridgeAction(args: string[], options: BridgeOptions = {}):
     }
   }
 
+  if (!command && (args.includes('--help') || args.includes('-h')) && binaryExists(binaryPath)) {
+    return { kind: 'delegate', binaryPath, args }
+  }
+
   if (!command || args.includes('--version') || args.includes('-V')) {
     return {
       kind: 'typescript',
