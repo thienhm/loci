@@ -451,6 +451,28 @@ fn upgrade_recovers_project_metadata_from_legacy_project_json() {
         )
         .expect("template pack count");
     assert_eq!(template_pack_count, 1);
+
+    let registry =
+        Connection::open(home.path().join(".loci/registry.db")).expect("open registry db");
+    let registered: (String, String, String, String) = registry
+        .query_row(
+            "SELECT id, name, prefix, path FROM registered_project WHERE id = 'legacy-project-id'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .expect("registered legacy project");
+    assert_eq!(registered.0, "legacy-project-id");
+    assert_eq!(registered.1, "Legacy App");
+    assert_eq!(registered.2, "LEG");
+    assert_eq!(
+        registered.3,
+        workspace
+            .path()
+            .canonicalize()
+            .expect("canonical workspace path")
+            .display()
+            .to_string()
+    );
 }
 
 #[test]
