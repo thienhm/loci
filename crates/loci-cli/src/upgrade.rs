@@ -3,15 +3,16 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Deserialize;
 use serde::Serialize;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
 use crate::db::connect_project_db;
+use crate::domain::ProjectRecord;
 use crate::paths::{find_workspace_root, LociPaths};
-use crate::project::get_project;
+use crate::project::{get_project, insert_project};
 use crate::templates;
 
 #[derive(Debug, Serialize)]
@@ -72,11 +73,29 @@ struct LegacyTicketFile {
     labels: Vec<String>,
     assignee: Option<String>,
     progress: i64,
+    #[serde(default)]
     archived: bool,
     #[serde(rename = "createdAt")]
     created_at: String,
     #[serde(rename = "updatedAt")]
     updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct LegacyProjectFile {
+    id: String,
+    name: String,
+    prefix: String,
+    #[serde(rename = "createdAt")]
+    created_at: String,
+}
+
+#[derive(Serialize)]
+struct ProjectConfig {
+    project_id: String,
+    name: String,
+    prefix: String,
+    loci_version: String,
 }
 
 impl UpgradeReport {
@@ -100,6 +119,7 @@ pub fn apply() -> Result<UpgradeReport> {
     let paths = workspace_paths("upgrade Loci project state")?;
 
     let conn = connect_project_db(&paths.project_db)?;
+    seed_missing_project_metadata(&paths, &conn)?;
     let mut report = build_report(&paths, &conn, false)?;
     report.legacy_import.backup_path = Some(backup_legacy_tickets(&paths)?.display().to_string());
     apply_legacy_ticket_imports(&conn, &paths, &report)?;
@@ -124,7 +144,7 @@ fn workspace_paths(home_context: &str) -> Result<LociPaths> {
 }
 
 fn build_report(paths: &LociPaths, conn: &Connection, dry_run: bool) -> Result<UpgradeReport> {
-    let project = get_project(conn)?;
+    let project = project_for_upgrade(paths, conn)?;
     let current_schema_version = current_schema_version(conn)?;
     let current_template_pack_version = current_template_pack_version(conn)?;
     let actions = template_actions(paths, &project)?;
@@ -154,13 +174,71 @@ fn current_schema_version(conn: &Connection) -> Result<i64> {
 }
 
 fn current_template_pack_version(conn: &Connection) -> Result<String> {
-    let version = conn.query_row(
-        "SELECT version FROM template_pack WHERE id = ?1",
-        params![templates::DEFAULT_TEMPLATE_PACK_ID],
-        |row| row.get::<_, String>(0),
-    )?;
+    let version = conn
+        .query_row(
+            "SELECT version FROM template_pack WHERE id = ?1",
+            params![templates::DEFAULT_TEMPLATE_PACK_ID],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
 
-    Ok(version)
+    Ok(version.unwrap_or_else(|| "missing".to_string()))
+}
+
+fn project_for_upgrade(paths: &LociPaths, conn: &Connection) -> Result<ProjectRecord> {
+    match get_project(conn) {
+        Ok(project) => Ok(project),
+        Err(error) if paths.project_state_dir.join("project.json").is_file() => {
+            legacy_project_record(paths).with_context(|| {
+                format!("read legacy project metadata after SQLite project lookup failed: {error}")
+            })
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn seed_missing_project_metadata(paths: &LociPaths, conn: &Connection) -> Result<()> {
+    if get_project(conn).is_ok() {
+        return Ok(());
+    }
+
+    let project = legacy_project_record(paths)?;
+    insert_project(conn, &project)?;
+    update_template_pack_state(conn)?;
+    write_project_config_if_missing(paths, &project)?;
+    Ok(())
+}
+
+fn legacy_project_record(paths: &LociPaths) -> Result<ProjectRecord> {
+    let path = paths.project_state_dir.join("project.json");
+    let raw = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let legacy: LegacyProjectFile =
+        serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+    Ok(ProjectRecord {
+        id: legacy.id,
+        name: legacy.name,
+        prefix: legacy.prefix,
+        loci_version: env!("CARGO_PKG_VERSION").to_string(),
+        created_at: legacy.created_at.clone(),
+        updated_at: legacy.created_at,
+    })
+}
+
+fn write_project_config_if_missing(paths: &LociPaths, project: &ProjectRecord) -> Result<()> {
+    if paths.project_config.exists() {
+        return Ok(());
+    }
+    if let Some(parent) = paths.project_config.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let config = ProjectConfig {
+        project_id: project.id.clone(),
+        name: project.name.clone(),
+        prefix: project.prefix.clone(),
+        loci_version: project.loci_version.clone(),
+    };
+    fs::write(&paths.project_config, toml::to_string(&config)?)?;
+    Ok(())
 }
 
 fn template_actions(
