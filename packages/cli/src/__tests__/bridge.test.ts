@@ -29,6 +29,19 @@ describe('TypeScript to Rust CLI bridge', () => {
     })
   })
 
+  it('delegates top-level help to the managed Rust binary when present', () => {
+    const action = planBridge(['--help'], {
+      env: { HOME: '/tmp/loci-home' },
+      binaryExists: () => true,
+    })
+
+    expect(action).toEqual({
+      kind: 'delegate',
+      binaryPath: join('/tmp/loci-home', '.loci', 'bin', 'loci'),
+      args: ['--help'],
+    })
+  })
+
   it('keeps TypeScript-only commands as explicit fallbacks', () => {
     const action = planBridge(['serve', '--help'], {
       env: { HOME: '/tmp/loci-home' },
