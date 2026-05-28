@@ -9,10 +9,11 @@ use serde::Serialize;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
 
-use crate::db::connect_project_db;
-use crate::domain::ProjectRecord;
+use crate::db::{connect_project_db, connect_registry_db};
+use crate::domain::{ProjectRecord, RegisteredProject};
 use crate::paths::{find_workspace_root, LociPaths};
 use crate::project::{get_project, insert_project};
+use crate::registry::upsert_registered_project;
 use crate::templates;
 
 #[derive(Debug, Serialize)]
@@ -122,11 +123,12 @@ pub fn apply() -> Result<UpgradeReport> {
     seed_missing_project_metadata(&paths, &conn)?;
     let mut report = build_report(&paths, &conn, false)?;
     report.legacy_import.backup_path = Some(backup_legacy_tickets(&paths)?.display().to_string());
-    apply_legacy_ticket_imports(&conn, &paths, &report)?;
-    apply_template_actions(&paths, &report)?;
-    update_template_pack_state(&conn)?;
-    update_project_loci_version(&conn)?;
-    update_project_config_version(&paths)?;
+    apply_legacy_ticket_imports(&conn, &paths, &report).context("apply legacy ticket imports")?;
+    apply_template_actions(&paths, &report).context("apply template actions")?;
+    update_template_pack_state(&conn).context("update template pack state")?;
+    update_project_loci_version(&conn).context("update project version metadata")?;
+    update_project_config_version(&paths).context("update project config version")?;
+    upsert_registry_project(&paths, &conn).context("upsert project in global registry")?;
 
     Ok(report)
 }
@@ -238,6 +240,40 @@ fn write_project_config_if_missing(paths: &LociPaths, project: &ProjectRecord) -
         loci_version: project.loci_version.clone(),
     };
     fs::write(&paths.project_config, toml::to_string(&config)?)?;
+    Ok(())
+}
+
+fn upsert_registry_project(paths: &LociPaths, conn: &Connection) -> Result<()> {
+    let project = get_project(conn)?;
+    let (open_ticket_count, review_ticket_count, validation_failure_count): (i64, i64, i64) = conn
+        .query_row(
+            r#"
+            SELECT
+              COALESCE(SUM(CASE WHEN status != 'done' THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN status = 'in_review' THEN 1 ELSE 0 END), 0),
+              COALESCE(SUM(CASE WHEN validation_state = 'failing' THEN 1 ELSE 0 END), 0)
+            FROM ticket
+            "#,
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )?;
+    let registered_project = RegisteredProject {
+        id: project.id,
+        name: project.name,
+        prefix: project.prefix,
+        path: paths.workspace_root.display().to_string(),
+        loci_version: env!("CARGO_PKG_VERSION").to_string(),
+        health_status: "warning".to_string(),
+        open_ticket_count,
+        review_ticket_count,
+        validation_failure_count,
+    };
+    let registry_conn = connect_registry_db(&paths.global_registry_db)?;
+    upsert_registered_project(
+        &registry_conn,
+        &registered_project,
+        &registered_project.path,
+    )?;
     Ok(())
 }
 
