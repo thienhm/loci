@@ -57,6 +57,15 @@
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
 - **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
 
-## Loci Task Management
-See LOCI.md for full instructions on working with this project's tickets.
-MCP server: http://localhost:3333/mcp
+## Loci Instructions
+Before working in this repo:
+
+1. Read `LOCI.md`.
+2. Run `loci doctor`.
+3. For ticket work, run `loci get <ticket-id> --json`.
+4. Read linked docs under `loci/`.
+5. Record validation evidence before moving work to review.
+
+<!-- LOCI:BEGIN -->
+Loci manages the workflow instructions in `LOCI.md`.
+<!-- LOCI:END -->
