@@ -85,3 +85,9 @@ pub fn refresh_registered_project_counts(workspace_root: &Path) -> Result<()> {
 
     Ok(())
 }
+
+pub fn warn_if_registered_project_counts_refresh_fails(workspace_root: &Path) {
+    if let Err(error) = refresh_registered_project_counts(workspace_root) {
+        eprintln!("warning: could not refresh registry summary counts: {error}");
+    }
+}

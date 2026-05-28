@@ -148,7 +148,7 @@ pub fn run(id: &str, should_run: bool, json: bool) -> Result<()> {
     }
 
     let validation_state = if any_failed { "failing" } else { "passing" };
-    registry::refresh_registered_project_counts(&root)?;
+    registry::warn_if_registered_project_counts_refresh_fails(&root);
     let response = ValidationRunResponse {
         ok: !any_failed,
         ticket_id: id.to_string(),

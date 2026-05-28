@@ -22,7 +22,7 @@ pub fn run(id: &str, status: &str, json: bool) -> Result<()> {
         &ticket.labels,
         ticket.progress,
     )?;
-    registry::refresh_registered_project_counts(&root)?;
+    registry::warn_if_registered_project_counts_refresh_fails(&root);
 
     let updated =
         project::get_ticket(&conn, id)?.ok_or_else(|| anyhow!("ticket {id} not found"))?;
