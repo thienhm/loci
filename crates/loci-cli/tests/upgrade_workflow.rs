@@ -57,6 +57,82 @@ fn seed_legacy_ticket(
     }
 }
 
+fn seed_legacy_ticket_without_archived(workspace_root: &Path, id: &str) {
+    let ticket_dir = workspace_root.join(".loci/tickets").join(id);
+    fs::create_dir_all(&ticket_dir).expect("create legacy ticket dir");
+    fs::write(
+        ticket_dir.join("ticket.json"),
+        format!(
+            r#"{{
+  "id": "{id}",
+  "title": "Legacy {id}",
+  "status": "todo",
+  "priority": "medium",
+  "labels": ["legacy"],
+  "assignee": null,
+  "progress": 0,
+  "createdAt": "2026-05-20T10:00:00.000Z",
+  "updatedAt": "2026-05-21T11:00:00.000Z"
+}}"#
+        ),
+    )
+    .expect("write old legacy ticket.json");
+    fs::write(ticket_dir.join("description.md"), "# Legacy Description\n")
+        .expect("write description");
+}
+
+fn legacy_metadata_workspace() -> (TempDir, TempDir) {
+    let (home, workspace) = initialized_workspace();
+    let state_dir = workspace.path().join(".loci");
+
+    fs::remove_file(state_dir.join("config.toml")).expect("remove new config");
+    fs::remove_dir_all(workspace.path().join("loci")).expect("remove visible docs");
+    fs::write(
+        state_dir.join("project.json"),
+        r#"{
+  "id": "legacy-project-id",
+  "name": "Legacy App",
+  "prefix": "LEG",
+  "nextId": 12,
+  "createdAt": "2026-05-01T09:00:00.000Z"
+}"#,
+    )
+    .expect("write legacy project json");
+
+    let conn = Connection::open(state_dir.join("loci.db")).expect("open project db");
+    conn.execute("DELETE FROM template_pack", [])
+        .expect("clear template pack metadata");
+    conn.execute("DELETE FROM project", [])
+        .expect("clear project metadata");
+    drop(conn);
+
+    (home, workspace)
+}
+
+#[test]
+fn upgrade_dry_run_treats_missing_legacy_archived_field_as_active() {
+    let (home, workspace) = initialized_workspace();
+    seed_legacy_ticket_without_archived(workspace.path(), "EXA-899");
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["upgrade", "--dry-run", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("parse upgrade json");
+    assert!(json["legacy_import"]["tickets"]
+        .as_array()
+        .expect("legacy tickets")
+        .iter()
+        .any(|action| action["ticket_id"] == "EXA-899" && action["status"] == "insert"));
+}
+
 #[test]
 fn upgrade_dry_run_reports_pending_template_pack_without_modifying_project() {
     let (home, workspace) = initialized_workspace();
@@ -322,6 +398,59 @@ fn upgrade_updates_stale_project_version_metadata() {
         .query_row("SELECT loci_version FROM project", [], |row| row.get(0))
         .expect("project db version");
     assert_eq!(db_version, env!("CARGO_PKG_VERSION"));
+}
+
+#[test]
+fn upgrade_recovers_project_metadata_from_legacy_project_json() {
+    let (home, workspace) = legacy_metadata_workspace();
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["upgrade", "--dry-run", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("parse upgrade json");
+    assert_eq!(json["template_pack"]["current_version"], "missing");
+    let conn = Connection::open(workspace.path().join(".loci/loci.db")).expect("open project db");
+    let project_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM project", [], |row| row.get(0))
+        .expect("project count after dry-run");
+    assert_eq!(project_count, 0);
+    drop(conn);
+
+    Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .arg("upgrade")
+        .assert()
+        .success()
+        .stdout(contains("Upgrade complete"));
+
+    let conn = Connection::open(workspace.path().join(".loci/loci.db")).expect("open project db");
+    let project: (String, String, String) = conn
+        .query_row("SELECT id, name, prefix FROM project", [], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        })
+        .expect("project metadata");
+    assert_eq!(project.0, "legacy-project-id");
+    assert_eq!(project.1, "Legacy App");
+    assert_eq!(project.2, "LEG");
+
+    let template_pack_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM template_pack WHERE id = 'loci-default'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("template pack count");
+    assert_eq!(template_pack_count, 1);
 }
 
 #[test]
