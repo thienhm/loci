@@ -2,6 +2,8 @@
 
 GitHub Releases for tagged versions build and attach platform-specific Rust CLI archives. These artifacts package the `crates/loci-cli` binary named `loci` with root `LICENSE` and `README.md` material.
 
+The release archives remain Rust-binary artifacts only. During the TypeScript fallback transition, `loci update` installs one of these archives and also refreshes the global Bun package that still provides `loci serve` and `loci open`.
+
 ## Artifact Names
 
 | Platform target | Archive |

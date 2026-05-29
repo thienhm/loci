@@ -44,7 +44,9 @@ fn help_describes_workflow_and_update_boundaries() {
         .stdout(contains(
             "Upgrade project data, SQLite state, and built-in template docs",
         ))
-        .stdout(contains("Install or replace the managed Loci tool binary"));
+        .stdout(contains(
+            "Install or replace the managed Loci tool binary and transitional Bun wrapper",
+        ));
 
     let mut upgrade = Command::cargo_bin("loci").expect("loci binary exists");
     upgrade
@@ -63,7 +65,9 @@ fn help_describes_workflow_and_update_boundaries() {
         .args(["update", "--help"])
         .assert()
         .success()
-        .stdout(contains("Install or replace the managed Loci tool binary"))
+        .stdout(contains(
+            "Install or replace the managed Loci tool binary and transitional Bun wrapper",
+        ))
         .stdout(contains(
             "Release tag to install, for example v1.2.3. Defaults to latest",
         ));
