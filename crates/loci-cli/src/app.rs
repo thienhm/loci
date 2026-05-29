@@ -16,7 +16,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Create a new workflow packet.
+    /// Create a workflow packet for new work.
     Add {
         /// Ticket title.
         title: String,
@@ -30,7 +30,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Shape a workflow packet.
+    /// Clarify a workflow packet's intent, scope, acceptance criteria, and validation.
     Shape {
         /// Ticket id, for example LCI-001.
         id: String,
@@ -68,7 +68,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Plan a shaped workflow packet.
+    /// Add checkable implementation steps to a shaped workflow packet.
     Plan {
         /// Ticket id, for example LCI-001.
         id: String,
@@ -82,7 +82,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Check whether a workflow packet is ready.
+    /// Check whether a workflow packet has enough shape and plan to start.
     Ready {
         /// Ticket id, for example LCI-001.
         id: String,
@@ -92,7 +92,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Inspect or run declared validation commands.
+    /// Inspect or run validation commands declared on a workflow packet.
     Validate {
         /// Ticket id, for example LCI-001.
         id: String,
@@ -106,7 +106,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Record and inspect validation evidence.
+    /// Record or inspect proof for validation and review.
     Evidence {
         #[command(subcommand)]
         command: EvidenceCommands,
@@ -130,7 +130,7 @@ pub enum Commands {
         command: BacklogCommands,
     },
 
-    /// Write a review summary.
+    /// Write a review summary for human handoff.
     Summary {
         /// Ticket id, for example LCI-001.
         id: String,
@@ -144,7 +144,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Move a ticket to review when proof gates pass.
+    /// Move a ticket to in_review after proof gates pass.
     Review {
         /// Ticket id, for example LCI-001.
         id: String,
@@ -158,9 +158,9 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Upgrade project data and built-in template docs.
+    /// Upgrade project data, SQLite state, and built-in template docs.
     Upgrade {
-        /// Report pending changes without modifying files or database state.
+        /// Report pending project-data changes without modifying files or database state.
         #[arg(long)]
         dry_run: bool,
 
@@ -169,9 +169,9 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Update the managed Loci tool binary.
+    /// Install or replace the managed Loci tool binary and transitional Bun wrapper.
     Update {
-        /// Release tag to install, for example v1.2.3. Defaults to the latest release.
+        /// Release tag to install, for example v1.2.3. Defaults to latest.
         #[arg(long)]
         version: Option<String>,
 

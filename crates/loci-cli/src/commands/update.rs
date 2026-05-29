@@ -33,6 +33,10 @@ pub fn run(
             report.target,
             report.installed_path.display()
         );
+        println!(
+            "Refreshed TypeScript serve/open wrapper package: {}",
+            report.wrapper_refresh.package
+        );
     }
 
     Ok(())

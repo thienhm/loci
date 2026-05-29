@@ -147,6 +147,26 @@ function seedSqliteRegistryAndProject() {
   return sqliteWorkspace
 }
 
+function seedUnreadableSqliteProject() {
+  const sqliteWorkspace = mkdtempSync(join(tmpdir(), 'loci-routes-broken-ws-'))
+  mkdirSync(join(sqliteWorkspace, '.loci', 'loci.db'), { recursive: true })
+
+  const registry = new Database(join(tmpHome, '.loci', 'registry.db'))
+  registry.run(`
+    INSERT INTO registered_project (
+      id, name, prefix, path, loci_version, last_seen_at, last_indexed_at,
+      health_status, open_ticket_count, review_ticket_count, validation_failure_count
+    )
+    VALUES (
+      'broken-project-uuid', 'Broken Project', 'BRK', ?, '1.1.0',
+      '2026-05-26T00:00:00Z', NULL, 'healthy', 7, 2, 1
+    )
+  `, [sqliteWorkspace])
+  registry.close()
+
+  return sqliteWorkspace
+}
+
 function readRegistrySummary(projectId: string) {
   const registry = new Database(join(tmpHome, '.loci', 'registry.db'))
   try {
@@ -240,6 +260,31 @@ describe('GET /api/projects', () => {
       validationFailureCount: 1,
     })
   })
+
+  it('keeps readable projects visible when one registered SQLite database cannot be opened', async () => {
+    seedSqliteRegistryAndProject()
+    const brokenWorkspace = seedUnreadableSqliteProject()
+
+    const res = await app.inject({ method: 'GET', url: '/api/projects' })
+
+    expect(res.statusCode).toBe(200)
+    const body = res.json<any[]>()
+    expect(body).toHaveLength(2)
+    expect(body.find((project) => project.id === 'sqlite-project-uuid')).toMatchObject({
+      available: true,
+      openTicketCount: 1,
+    })
+    const broken = body.find((project) => project.id === 'broken-project-uuid')
+    expect(broken).toMatchObject({
+      available: false,
+      healthStatus: 'error',
+      openTicketCount: 7,
+      reviewTicketCount: 2,
+      validationFailureCount: 1,
+    })
+    expect(broken.unavailableReason).toContain(join(brokenWorkspace, '.loci', 'loci.db'))
+    expect(broken.unavailableReason).toContain('unable to open')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -310,6 +355,18 @@ describe('GET /api/projects/:projectId/tickets', () => {
       riskLane: 'high_risk',
       validationState: 'failing',
     })
+  })
+
+  it('returns a precise diagnostic when a SQLite project database cannot be opened', async () => {
+    seedSqliteRegistryAndProject()
+    const brokenWorkspace = seedUnreadableSqliteProject()
+
+    const res = await app.inject({ method: 'GET', url: '/api/projects/broken-project-uuid/tickets' })
+
+    expect(res.statusCode).toBe(503)
+    const body = res.json<any>()
+    expect(body.error).toContain(join(brokenWorkspace, '.loci', 'loci.db'))
+    expect(body.error).toContain('unable to open')
   })
 })
 

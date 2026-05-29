@@ -15,6 +15,8 @@ LCI-055 resolves the TypeScript-only commands left after the Rust-primary bridge
 | `sync` | Retire | It rewrites `LOCI.md` and migrates legacy archived ticket layout. Rust `loci upgrade` is now the project-data/template upgrade boundary. | Use `loci upgrade` for project template/doc upgrades. |
 | `skill` | Retire from product CLI | It installs a Claude-specific skill and is agent-tooling distribution, not Loci project/runtime behavior. | Install or update skills through the agent tooling, or copy `skills/loci/SKILL.md` manually. |
 
+During this transition, `loci update` is Rust-primary but must also refresh the global Bun package because `serve` and `open` still run through that TypeScript fallback layer.
+
 ## Bridge Result
 
 The TypeScript fallback table is reduced to:

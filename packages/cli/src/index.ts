@@ -38,7 +38,7 @@ async function runTypeScriptCli() {
   program
     .name('loci')
     .description('Local ticket management tool')
-    .version('2.0.0')
+    .version('2.0.1')
 
   program.addCommand(initCommand)
   program.addCommand(addCommand)

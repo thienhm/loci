@@ -95,6 +95,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     if (hasSqliteRegistry()) {
       const project = listDashboardProjects().find((p) => p.id === req.params.projectId)
       if (!project) return reply.status(404).send({ error: 'Project not found' })
+      if (!project.available) {
+        return reply.status(503).send({ error: project.unavailableReason ?? 'Project database is unavailable' })
+      }
       return reply.send(listDashboardTickets(req.params.projectId, req.query))
     }
 
@@ -172,6 +175,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       if (hasSqliteRegistry()) {
         const project = listDashboardProjects().find((p) => p.id === req.params.projectId)
         if (!project) return reply.status(404).send({ error: 'Project not found' })
+        if (!project.available) {
+          return reply.status(503).send({ error: project.unavailableReason ?? 'Project database is unavailable' })
+        }
 
         const ticket = readDashboardTicket(req.params.projectId, req.params.ticketId)
         if (!ticket) return reply.status(404).send({ error: 'Ticket not found' })

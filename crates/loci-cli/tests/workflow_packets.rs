@@ -151,6 +151,41 @@ fn add_human_output_mentions_created_ticket() {
 }
 
 #[test]
+fn add_succeeds_when_post_create_registry_refresh_fails() {
+    let (home, workspace) = initialized_workspace();
+    let registry_path = home.path().join(".loci/registry.db");
+    std::fs::remove_file(&registry_path).expect("remove registry db");
+    std::fs::create_dir(&registry_path).expect("create invalid registry path");
+
+    let output = Command::cargo_bin("loci")
+        .expect("loci binary exists")
+        .current_dir(workspace.path())
+        .env("HOME", home.path())
+        .args(["add", "Post-create registry failure", "--json"])
+        .assert()
+        .success()
+        .stderr(contains(
+            "warning: could not refresh registry summary counts",
+        ))
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).expect("json add output");
+    assert_eq!(value["id"], "EXA-001");
+    assert_eq!(value["title"], "Post-create registry failure");
+
+    let story_path = workspace.path().join("loci/tickets/EXA-001/story.md");
+    assert!(story_path.is_file());
+
+    let conn = Connection::open(workspace.path().join(".loci/loci.db")).expect("open db");
+    let row_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM ticket", [], |row| row.get(0))
+        .expect("ticket row count");
+    assert_eq!(row_count, 1);
+}
+
+#[test]
 fn add_fails_when_next_story_packet_already_exists_without_db_row() {
     let (home, workspace) = initialized_workspace();
     let orphan_dir = workspace.path().join("loci/tickets/EXA-001");

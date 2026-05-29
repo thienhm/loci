@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/thienhm/loci/main/scripts/install.s
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/thienhm/loci/main/scripts/install.sh | bash -s -- v2.0.0
+curl -fsSL https://raw.githubusercontent.com/thienhm/loci/main/scripts/install.sh | bash -s -- v2.0.1
 ```
 
 Transition bootstrap (legacy Bun launcher):
@@ -32,7 +32,18 @@ bun install -g github:thienhm/loci
 loci update
 ```
 
+During the transition, `loci update` refreshes both the managed Rust binary and the global Bun package that still provides `loci serve` and `loci open`.
+
 Managed binary location: `~/.loci/bin/loci`
+
+## What's New In 2.0.1
+
+Loci 2.0.1 is a patch release for the Rust-primary 2.0 line:
+
+- `loci update` now refreshes both the managed Rust binary and the global Bun wrapper used by `loci serve` and `loci open`.
+- Dashboard reads now recover from local SQLite open edge cases and keep healthy registered projects visible.
+- Ticket creation no longer reports a hard failure when only the post-create registry summary refresh fails.
+- CLI help and release documentation now describe the `loci update` / `loci upgrade` boundary more clearly.
 
 ## Quick Start
 
@@ -113,7 +124,7 @@ Loci also exposes an MCP server at `http://localhost:3333/mcp` (requires `loci s
 | `loci doctor` | Check harness/project health |
 | `loci serve` | Start the MCP server and web UI |
 | `loci open` | Open the web UI in your browser |
-| `loci update` | Update the managed Loci tool binary |
+| `loci update` | Update the managed Rust binary and transitional Bun wrapper |
 | `loci upgrade` | Upgrade project templates/data |
 
 ### Tickets
@@ -146,6 +157,12 @@ Loci also exposes an MCP server at `http://localhost:3333/mcp` (requires `loci s
 
 ```bash
 loci update
+```
+
+This installs the managed Rust binary and refreshes the global Bun `loci` package so TypeScript fallback commands such as `loci serve` use the latest server/web code. If the wrapper refresh fails, the command prints the manual recovery command:
+
+```bash
+bun remove -g loci && bun install -g github:thienhm/loci
 ```
 
 If you're on an older install and `loci update` cannot run yet, bootstrap once manually:

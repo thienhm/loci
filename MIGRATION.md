@@ -1,5 +1,33 @@
 # Migration Guide
 
+## v2.0.0 → v2.0.1: Patch Update
+
+This patch release does not require a project data migration.
+
+### Steps
+
+1. **Update Loci**
+
+   ```bash
+   loci update
+   ```
+
+   During the Rust-primary transition, this refreshes both the managed Rust binary and the global Bun package that still provides `loci serve` and `loci open`.
+
+2. **Manual recovery if the wrapper is stale**
+
+   If `loci update` cannot run yet, or if it reports that the TypeScript wrapper refresh failed, refresh the Bun layer manually:
+
+   ```bash
+   bun remove -g loci && bun install -g github:thienhm/loci
+   ```
+
+   Then run:
+
+   ```bash
+   loci update
+   ```
+
 ## v0.1.3 → v0.1.4: MCP to CLI
 
 The recommended way for AI agents to interact with Loci has changed from MCP tools to the `loci` CLI. This reduces context window usage and token costs — the CLI reads directly from disk without requiring the server.

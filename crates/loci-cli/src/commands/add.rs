@@ -53,7 +53,7 @@ pub fn run(title: &str, priority: PriorityArg, json: bool) -> Result<()> {
         let _ = std::fs::remove_file(&story_file);
         return Err(error.into());
     }
-    registry::refresh_registered_project_counts(&root)?;
+    registry::warn_if_registered_project_counts_refresh_fails(&root);
 
     if json {
         println!("{}", serde_json::to_string(&ticket)?);

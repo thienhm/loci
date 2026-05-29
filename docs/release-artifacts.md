@@ -2,6 +2,8 @@
 
 GitHub Releases for tagged versions build and attach platform-specific Rust CLI archives. These artifacts package the `crates/loci-cli` binary named `loci` with root `LICENSE` and `README.md` material.
 
+The release archives remain Rust-binary artifacts only. During the TypeScript fallback transition, `loci update` installs one of these archives and also refreshes the global Bun package that still provides `loci serve` and `loci open`.
+
 ## Artifact Names
 
 | Platform target | Archive |
@@ -35,3 +37,11 @@ loci/
 ```
 
 Release jobs smoke-test the built binary with `loci --help`, package the archive, extract the packaged archive, and smoke-test the packaged binary again before uploading artifacts.
+
+## 2.0.1 Release Notes
+
+The 2.0.1 release keeps the same Rust artifact contract as 2.0.0. The patch release focuses on update reliability and local dashboard stability:
+
+- `loci update` installs the release archive and refreshes the Bun fallback package used by `serve` and `open`.
+- If the Bun refresh fails, `loci update` reports the manual recovery command instead of silently leaving `loci serve` stale.
+- No release artifact shape changes are required for this patch.
