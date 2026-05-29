@@ -178,8 +178,9 @@ function projectSummaryFromRegistryRow(row: RegistryRow): DashboardProject {
     }
   }
 
-  const db = openReadOnly(projectDbPath)
+  let db: Database | null = null
   try {
+    db = openReadOnly(projectDbPath)
     const tickets = readTickets(db)
     return {
       ...registryRowBase(row),
@@ -195,15 +196,20 @@ function projectSummaryFromRegistryRow(row: RegistryRow): DashboardProject {
       ...registryRowBase(row),
       healthStatus: 'error',
       available: false,
-      unavailableReason: error instanceof Error ? error.message : 'Failed to read project database',
+      unavailableReason: databaseOpenError(projectDbPath, error),
       openTicketCount: row.open_ticket_count,
       reviewTicketCount: row.review_ticket_count,
       validationFailureCount: row.validation_failure_count,
       ticketStatusCounts: emptyStatusCounts(),
     }
   } finally {
-    db.close()
+    db?.close()
   }
+}
+
+function databaseOpenError(path: string, error: unknown): string {
+  const reason = error instanceof Error ? error.message : 'unknown error'
+  return `unable to open project database ${path}: ${reason}`
 }
 
 function registryRowBase(row: RegistryRow) {
@@ -404,5 +410,14 @@ function normalizeHealth(status: string): ProjectHealthStatus {
 }
 
 function openReadOnly(path: string): Database {
-  return Database.open(path, { readonly: true })
+  try {
+    return Database.open(path, { readonly: true })
+  } catch (error) {
+    if (!isUnableToOpenDatabase(error)) throw error
+    return Database.open(path, { readwrite: true, create: false })
+  }
+}
+
+function isUnableToOpenDatabase(error: unknown): boolean {
+  return error instanceof Error && error.message.toLowerCase().includes('unable to open database file')
 }

@@ -218,6 +218,34 @@ describe('SQLite dashboard data', () => {
     expect(projects[0].unavailableReason).toContain('.loci/loci.db')
   })
 
+  it('keeps unreadable project databases visible without hiding healthy projects', () => {
+    mkdirSync(join(missingWorkspace, '.loci', 'loci.db'), { recursive: true })
+    seedRegistry([
+      { id: 'project-unreadable', name: 'Broken Project', prefix: 'BP', path: missingWorkspace },
+      { id: 'project-healthy', name: 'Healthy Project', prefix: 'HP', path: healthyWorkspace },
+    ])
+    seedProjectDb(healthyWorkspace)
+
+    const projects = listDashboardProjects(tmpHome)
+
+    expect(projects).toHaveLength(2)
+    expect(projects[0]).toMatchObject({
+      id: 'project-unreadable',
+      available: false,
+      healthStatus: 'error',
+      openTicketCount: 0,
+      reviewTicketCount: 0,
+      validationFailureCount: 0,
+    })
+    expect(projects[0].unavailableReason).toContain(join(missingWorkspace, '.loci', 'loci.db'))
+    expect(projects[0].unavailableReason).toContain('unable to open')
+    expect(projects[1]).toMatchObject({
+      id: 'project-healthy',
+      available: true,
+      openTicketCount: 2,
+    })
+  })
+
   it('lists tickets and falls back to empty labels for malformed labels_json', () => {
     seedRegistry([
       { id: 'project-healthy', name: 'Healthy Project', prefix: 'HP', path: healthyWorkspace },
