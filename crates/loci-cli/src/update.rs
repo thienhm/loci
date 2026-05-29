@@ -5,6 +5,7 @@ use std::io::{Cursor, Read};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, bail, Context, Result};
 use flate2::read::GzDecoder;
@@ -14,6 +15,8 @@ use tar::Archive;
 use zip::ZipArchive;
 
 const CHECKSUMS_ASSET: &str = "loci-SHA256SUMS.txt";
+pub const WRAPPER_REFRESH_MANUAL_COMMAND: &str =
+    "bun remove -g loci && bun install -g github:thienhm/loci";
 
 #[derive(Debug, Clone)]
 pub struct UpdateRequest {
@@ -31,6 +34,14 @@ pub struct UpdateReport {
     pub installed_path: PathBuf,
     pub metadata_path: PathBuf,
     pub checksum: String,
+    pub wrapper_refresh: WrapperRefreshReport,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WrapperRefreshReport {
+    pub ok: bool,
+    pub package: String,
+    pub manual_recovery_command: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -141,6 +152,8 @@ pub fn install(request: &UpdateRequest, source: &impl ReleaseSource) -> Result<U
     fs::write(&metadata_path, serde_json::to_vec_pretty(&metadata)?)
         .context("write managed Loci version metadata")?;
 
+    let wrapper_refresh = refresh_typescript_wrapper()?;
+
     Ok(UpdateReport {
         ok: true,
         version,
@@ -149,6 +162,44 @@ pub fn install(request: &UpdateRequest, source: &impl ReleaseSource) -> Result<U
         installed_path,
         metadata_path,
         checksum: actual_checksum,
+        wrapper_refresh,
+    })
+}
+
+pub fn refresh_typescript_wrapper() -> Result<WrapperRefreshReport> {
+    let _ = Command::new("bun")
+        .args(["remove", "-g", "loci"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+
+    let status = Command::new("bun")
+        .args(["install", "-g", "github:thienhm/loci"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .with_context(|| {
+            format!(
+                "TypeScript serve/open wrapper refresh failed. `loci serve` may still be stale. Run `{}` to refresh the wrapper manually",
+                WRAPPER_REFRESH_MANUAL_COMMAND
+            )
+        })?;
+
+    if !status.success() {
+        bail!(
+            "TypeScript serve/open wrapper refresh failed with exit code {}. `loci serve` may still be stale. Run `{}` to refresh the wrapper manually.",
+            status
+                .code()
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
+            WRAPPER_REFRESH_MANUAL_COMMAND
+        );
+    }
+
+    Ok(WrapperRefreshReport {
+        ok: true,
+        package: "github:thienhm/loci".to_string(),
+        manual_recovery_command: WRAPPER_REFRESH_MANUAL_COMMAND.to_string(),
     })
 }
 

@@ -169,7 +169,7 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Install or replace the managed Loci tool binary.
+    /// Install or replace the managed Loci tool binary and transitional Bun wrapper.
     Update {
         /// Release tag to install, for example v1.2.3. Defaults to latest.
         #[arg(long)]
