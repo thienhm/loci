@@ -22,7 +22,7 @@ curl -fsSL https://raw.githubusercontent.com/thienhm/loci/main/scripts/install.s
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/thienhm/loci/main/scripts/install.sh | bash -s -- v2.0.0
+curl -fsSL https://raw.githubusercontent.com/thienhm/loci/main/scripts/install.sh | bash -s -- v2.0.1
 ```
 
 Transition bootstrap (legacy Bun launcher):
@@ -35,6 +35,15 @@ loci update
 During the transition, `loci update` refreshes both the managed Rust binary and the global Bun package that still provides `loci serve` and `loci open`.
 
 Managed binary location: `~/.loci/bin/loci`
+
+## What's New In 2.0.1
+
+Loci 2.0.1 is a patch release for the Rust-primary 2.0 line:
+
+- `loci update` now refreshes both the managed Rust binary and the global Bun wrapper used by `loci serve` and `loci open`.
+- Dashboard reads now recover from local SQLite open edge cases and keep healthy registered projects visible.
+- Ticket creation no longer reports a hard failure when only the post-create registry summary refresh fails.
+- CLI help and release documentation now describe the `loci update` / `loci upgrade` boundary more clearly.
 
 ## Quick Start
 
